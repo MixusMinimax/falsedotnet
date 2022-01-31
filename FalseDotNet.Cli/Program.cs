@@ -1,33 +1,26 @@
 ﻿using CommandLine;
+using FalseDotNet;
+using FalseDotNet.Cli.ParserExtensions;
+using Microsoft.Extensions.DependencyInjection;
 
-int RunInterpretAndReturnExitCode(InterpreterOptions opts)
+return new ServiceCollection()
+    .RegisterSubCommands(typeof(Program))
+    .AddSingleton<ICodeParser, CodeParser>()
+    .AddSingleton<ILogger, DefaultLogger>()
+    .BuildServiceProvider()
+    .ParseAndExecute(Parser.Default, args, _ => 1);
+
+class DefaultLogger : ILogger
 {
-    Console.WriteLine($"Interpret. Input file: {opts.InputPath}");
-    return 0;
-}
+    public ILogger Write(string message)
+    {
+        Console.Write(message);
+        return this;
+    }
 
-int RunCompileAndReturnExitCode(CompileOptions opts)
-{
-    Console.WriteLine($"Compile. Input file: {opts.InputPath}");
-    return 0;
-}
-
-return Parser.Default.ParseArguments<InterpreterOptions, CompileOptions>(args).MapResult(
-    (InterpreterOptions opts) => RunInterpretAndReturnExitCode(opts),
-    (CompileOptions opts) => RunCompileAndReturnExitCode(opts),
-    errs => 1
-);
-
-[Verb("interpret", HelpText = "interpret FALSE code.")]
-class InterpreterOptions
-{
-    [Value(0, MetaName = "PATH", Required = true, HelpText = "File containing FALSE code.")]
-    public string InputPath { get; set; } = default!;
-}
-
-[Verb("compile", HelpText = "compile FALSE code.")]
-class CompileOptions
-{
-    [Value(0, MetaName = "PATH", Required = true, HelpText = "File containing FALSE code.")]
-    public string InputPath { get; set; } = default!;
+    public ILogger WriteLine(string message)
+    {
+        Console.WriteLine(message);
+        return this;
+    }
 }
