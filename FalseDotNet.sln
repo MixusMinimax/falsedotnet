@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FalseDotNet", "FalseDotNet\FalseDotNet.csproj", "{5526644F-9873-4EB8-8E06-C87240886226}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FalseDotNet.Cli", "FalseDotNet.Cli\FalseDotNet.Cli.csproj", "{5526644F-9873-4EB8-8E06-C87240886226}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
