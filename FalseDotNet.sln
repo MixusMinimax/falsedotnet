@@ -1,0 +1,16 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FalseDotNet", "FalseDotNet\FalseDotNet.csproj", "{5526644F-9873-4EB8-8E06-C87240886226}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5526644F-9873-4EB8-8E06-C87240886226}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5526644F-9873-4EB8-8E06-C87240886226}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5526644F-9873-4EB8-8E06-C87240886226}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5526644F-9873-4EB8-8E06-C87240886226}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
