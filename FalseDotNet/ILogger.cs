@@ -2,6 +2,6 @@
 
 public interface ILogger
 {
-    public ILogger Write(string message);
-    public ILogger WriteLine(string message);
+    public ILogger Write<T>(T message);
+    public ILogger WriteLine<T>(T message);
 }

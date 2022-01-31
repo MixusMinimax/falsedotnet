@@ -7,13 +7,15 @@ namespace FalseDotNet.Cli.SubCommands;
 
 public class InterpretCommand : ISubCommand<InterpretOptions>
 {
-    private ICodeParser _codeParser;
-    private ILogger _logger;
+    private readonly ILogger _logger;
+    private readonly ICodeParser _codeParser;
+    private readonly IInterpreter _interpreter;
 
-    public InterpretCommand(ICodeParser codeParser, ILogger logger)
+    public InterpretCommand(ILogger logger, ICodeParser codeParser, IInterpreter interpreter)
     {
-        _codeParser = codeParser;
         _logger = logger;
+        _codeParser = codeParser;
+        _interpreter = interpreter;
     }
 
     public int Run(InterpretOptions opts)
@@ -24,6 +26,7 @@ public class InterpretCommand : ISubCommand<InterpretOptions>
             using var sr = new StreamReader(opts.InputPath);
             var code = sr.ReadToEnd();
             var parsedCode = _codeParser.Parse(code);
+            _interpreter.Interpret(parsedCode, opts.PrintOperations);
         }
         catch (IOException e)
         {
