@@ -1,4 +1,4 @@
-﻿namespace FalseDotNet;
+﻿namespace FalseDotNet.Parsing;
 
 public class CodeParserException : Exception
 {

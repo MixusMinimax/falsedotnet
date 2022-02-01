@@ -1,4 +1,6 @@
-﻿namespace FalseDotNet.Cli;
+﻿using FalseDotNet.Utility;
+
+namespace FalseDotNet.Cli;
 
 public class DefaultLogger : ILogger
 {

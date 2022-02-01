@@ -1,4 +1,4 @@
-﻿namespace FalseDotNet;
+﻿namespace FalseDotNet.Utility;
 
 public interface ILogger
 {

@@ -1,4 +1,4 @@
-﻿namespace FalseDotNet;
+﻿namespace FalseDotNet.Interpret;
 
 public class InterpreterException : Exception
 {

@@ -1,6 +1,9 @@
 ﻿using System.Drawing;
 using CommandLine;
 using FalseDotNet.Cli.ParserExtensions;
+using FalseDotNet.Interpret;
+using FalseDotNet.Parsing;
+using FalseDotNet.Utility;
 using Pastel;
 
 namespace FalseDotNet.Cli.SubCommands;
