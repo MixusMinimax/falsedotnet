@@ -1,5 +1,4 @@
 ﻿using CommandLine;
-using FalseDotNet;
 using FalseDotNet.Cli;
 using FalseDotNet.Cli.ParserExtensions;
 using FalseDotNet.Compilation;

@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.Text.RegularExpressions;
 using FalseDotNet.Operations;
 using FalseDotNet.Utility;
 
@@ -141,6 +142,7 @@ public class CodeParser : ICodeParser
 
     public Program Parse(string code)
     {
+        code = Regex.Replace(code, @"\r\n", "\n");
         var characters = new LinkedList<char>(code);
 
         var lambdaIds = new Stack<long>();

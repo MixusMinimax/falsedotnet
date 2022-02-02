@@ -62,7 +62,7 @@ public class Interpreter : IInterpreter
         {
             var (operation, argument) = currentInstructions[pc];
             if (printOperations)
-                _logger.WriteLine(operation.ToString().Pastel(Color.FromArgb(255, 120, 120, 120)));
+                _logger.WriteLine(currentInstructions[pc].ToString().Pastel(Color.FromArgb(255, 120, 120, 120)));
             long a, b;
             long offset, condition;
             long lambdaId, body;

@@ -4,6 +4,7 @@ using FalseDotNet.Cli.ParserExtensions;
 using FalseDotNet.Compilation;
 using FalseDotNet.Parsing;
 using FalseDotNet.Utility;
+using Microsoft.Extensions.DependencyInjection;
 using Pastel;
 
 namespace FalseDotNet.Cli.SubCommands;
@@ -21,14 +22,24 @@ public class CompileCommand : ISubCommand<CompileOptions>
         _compiler = compiler;
     }
 
+    public static IServiceCollection RegisterServices(IServiceCollection services)
+    {
+        services.AddSingleton(_ => new CompilerConfig
+        {
+            StartLabels = new List<string> { "_start", "main" }
+        });
+        return services;
+    }
+
     public int Run(CompileOptions opts)
     {
         if (string.IsNullOrWhiteSpace(opts.OutputPath))
             opts.OutputPath = Regex.Replace(opts.InputPath, @"^(?:[^/\\]*[/\\])*(.*?)(?:\.+[^.]*)?$", "$1.asm");
         if (Path.GetFullPath(opts.InputPath) == Path.GetFullPath(opts.OutputPath))
             throw new ArgumentException("Input and Output path point to the same file!");
+        new FileInfo(opts.OutputPath).Directory?.Create();
         _logger.WriteLine($"Compiling [{opts.InputPath}] into [{opts.OutputPath}].".Pastel(Color.Aqua));
-        
+
         try
         {
             using var sr = new StreamReader(opts.InputPath);

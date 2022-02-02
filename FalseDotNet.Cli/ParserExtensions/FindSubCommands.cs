@@ -1,5 +1,6 @@
 ﻿using System.Drawing;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using CommandLine;
 using FalseDotNet.Utility;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +43,25 @@ public static class FindSubCommands
             from command in subCommands.Values
             select new ServiceDescriptor(command.SubCommand, command.SubCommand, ServiceLifetime.Transient)
         );
+
+        foreach (var cmd in subCommands.Values)
+        {
+            var (subcommand, _) = cmd;
+            var registerServices = subcommand.GetMethods().FirstOrDefault(m =>
+                m.GetParameters().Length == 1 &&
+                m.GetParameters()[0].ParameterType.IsAssignableFrom(typeof(IServiceCollection)) &&
+                Regex.IsMatch(m.Name.ToLower(), @"register_?services"));
+            if (registerServices is null)
+                continue;
+            try
+            {
+                registerServices.Invoke(null, new object[] { services });
+            }
+            catch (TargetInvocationException exception)
+            {
+                throw exception.InnerException!;
+            }
+        }
 
         return services.AddSingleton(new SubCommandsDict(subCommands));
     }

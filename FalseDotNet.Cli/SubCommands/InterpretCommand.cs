@@ -1,5 +1,4 @@
 ﻿using System.Drawing;
-using CommandLine;
 using FalseDotNet.Cli.ParserExtensions;
 using FalseDotNet.Interpret;
 using FalseDotNet.Parsing;

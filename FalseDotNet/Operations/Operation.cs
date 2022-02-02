@@ -34,7 +34,9 @@ public enum Operation
     Ret,
     Execute,
     ConditionalExecute,
-    WhileInit, WhileCondition, WhileBody,
+    WhileInit,
+    WhileCondition,
+    WhileBody,
     Exit,
 
 // Names
@@ -48,4 +50,16 @@ public enum Operation
     PrintString,
     OutputChar,
     OutputDecimal,
+}
+
+public static class OperationExtensions
+{
+    public static bool HasArgument(this Operation op) => op switch
+    {
+        Operation.IntLiteral => true,
+        Operation.Lambda => true,
+        Operation.Ref => true,
+        Operation.PrintString => true,
+        _ => false
+    };
 }
