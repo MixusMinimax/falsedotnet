@@ -8,7 +8,7 @@
 	1+
 ]#%
 
-'D,'o,'n,'e,'.,10,
+"Done."10,
 
 {-- Expected output --}
 {

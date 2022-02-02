@@ -45,6 +45,7 @@ public enum Operation
 
 // I/O
 
+    PrintString,
     OutputChar,
     OutputDecimal,
 }

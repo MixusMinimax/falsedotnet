@@ -38,7 +38,7 @@ public class Interpreter : IInterpreter
 
     public void Interpret(Program program, bool printOperations = true)
     {
-        var (entryId, functions) = program;
+        var (entryId, functions, strings) = program;
         var currentInstructions = functions[entryId];
         long currentLambdaId = 0;
         var callStack = new Stack<(int ProgramCounter, long lambdaId)>();
@@ -234,6 +234,10 @@ public class Interpreter : IInterpreter
 
                 // I/O
 
+                case Operation.PrintString:
+                    _logger.Write(strings[argument]);
+                    break;
+                
                 case Operation.OutputChar:
                     a = Pop();
                     _logger.Write((char)a);

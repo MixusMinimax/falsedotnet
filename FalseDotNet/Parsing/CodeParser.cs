@@ -1,15 +1,19 @@
-﻿using FalseDotNet.Operations;
+﻿using System.Text;
+using FalseDotNet.Operations;
 using FalseDotNet.Utility;
 
 namespace FalseDotNet.Parsing;
 
 public class CodeParser : ICodeParser
 {
-    private readonly IIdGenerator _idGenerator;
+    private readonly IIdGenerator _lambdaIdGenerator;
+    private readonly IIdGenerator _stringIdGenerator;
+    private readonly Dictionary<long, string> _strings = new();
 
-    public CodeParser(IIdGenerator idGenerator)
+    public CodeParser(IIdGenerator lambdaIdGenerator, IIdGenerator stringIdGenerator)
     {
-        _idGenerator = idGenerator;
+        _lambdaIdGenerator = lambdaIdGenerator;
+        _stringIdGenerator = stringIdGenerator;
     }
 
     private Instruction? ParseOperation(LinkedList<char> characters)
@@ -89,7 +93,7 @@ public class CodeParser : ICodeParser
                 return Operation.Eq;
 
             case '[':
-                return new Instruction(Operation.Lambda, _idGenerator.NewId);
+                return new Instruction(Operation.Lambda, _lambdaIdGenerator.NewId);
 
             case ']':
                 return Operation.Ret;
@@ -112,14 +116,26 @@ public class CodeParser : ICodeParser
             case ';':
                 return Operation.Load;
 
+            case '"':
+                var str = new StringBuilder();
+                while (characters.Count > 0)
+                {
+                    var c = characters.PopFront();
+                    if (c is '"') break;
+                    str.Append(c);
+                }
+
+                var id = _stringIdGenerator.NewId;
+                _strings[id] = str.ToString();
+                return new Instruction(Operation.PrintString, id);
+            
             case '.':
                 return Operation.OutputDecimal;
 
             case ',':
                 return Operation.OutputChar;
         }
-
-
+        
         return null;
     }
 
@@ -130,7 +146,7 @@ public class CodeParser : ICodeParser
         var lambdaIds = new Stack<long>();
         var lambdas = new Dictionary<long, LinkedList<Instruction>>();
         var instructions = new LinkedList<Instruction>();
-        var entryId = _idGenerator.NewId;
+        var entryId = _lambdaIdGenerator.NewId;
         lambdaIds.Push(entryId);
         lambdas[entryId] = instructions;
 
@@ -169,7 +185,8 @@ public class CodeParser : ICodeParser
             lambdas.ToDictionary(
                 e => e.Key,
                 e => (IReadOnlyList<Instruction>)e.Value.ToList()
-            )
+            ),
+            _strings
         );
     }
 }
