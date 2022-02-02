@@ -29,14 +29,11 @@ public class InterpretCommand : ISubCommand<InterpretOptions>
             using var sr = new StreamReader(opts.InputPath);
             var code = sr.ReadToEnd();
             var parsedCode = _codeParser.Parse(code);
-            try
-            {
-                _interpreter.Interpret(parsedCode, opts.PrintOperations);
-            }
-            catch (InterpreterException exception)
-            {
-                _logger.WriteLine(exception.Message.Pastel(Color.IndianRed));
-            }
+            _interpreter.Interpret(parsedCode, opts.PrintOperations);
+        }
+        catch (InterpreterException exception)
+        {
+            _logger.WriteLine(exception.Message.Pastel(Color.IndianRed));
         }
         catch (IOException e)
         {

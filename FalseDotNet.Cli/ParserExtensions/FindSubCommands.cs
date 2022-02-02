@@ -1,6 +1,10 @@
-﻿using CommandLine;
+﻿using System.Drawing;
+using System.Reflection;
+using CommandLine;
+using FalseDotNet.Utility;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Pastel;
 
 namespace FalseDotNet.Cli.ParserExtensions;
 
@@ -46,7 +50,7 @@ public static class FindSubCommands
         Parser parser, IEnumerable<string> args, Func<IEnumerable<Error>, int> onError)
     {
         var subCommands = services.GetRequiredService<SubCommandsDict>().SubCommands;
-        
+
         var result = parser.ParseArguments(args, subCommands.Keys.ToArray());
 
         if (result is not Parsed<object> parsed) return onError(((NotParsed<object>)result).Errors);
@@ -57,6 +61,15 @@ public static class FindSubCommands
         var func = commandType.GetMethods().First(m =>
             m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == optionsType &&
             m.Name == typeof(ISubCommand<>).GetMethods()[0].Name);
-        return (int)(func.Invoke(command, new[] { parsed.Value }) ?? 1);
+        try
+        {
+            return (int)(func.Invoke(command, new[] { parsed.Value }) ?? 1);
+        }
+        catch (TargetInvocationException exception)
+        {
+            var e = exception.InnerException!;
+            services.GetRequiredService<ILogger>().WriteLine(e.ToString().Pastel(Color.IndianRed));
+            return 1;
+        }
     }
 }
