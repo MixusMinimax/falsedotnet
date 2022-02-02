@@ -34,7 +34,8 @@ public enum Operation
     Ret,
     Execute,
     ConditionalExecute,
-    While,
+    WhileInit, WhileCondition, WhileBody,
+    Exit,
 
 // Names
 

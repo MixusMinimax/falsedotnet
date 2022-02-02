@@ -101,7 +101,7 @@ public class CodeParser : ICodeParser
                 return Operation.ConditionalExecute;
 
             case '#':
-                return Operation.While;
+                return Operation.WhileInit;
 
             case >= 'a' and <= 'z':
                 return new Instruction(Operation.Ref, character - 'a');
@@ -129,7 +129,10 @@ public class CodeParser : ICodeParser
 
         var lambdaIds = new Stack<long>();
         var lambdas = new Dictionary<long, LinkedList<Instruction>>();
-        LinkedList<Instruction> instructions, program = instructions = new LinkedList<Instruction>();
+        var instructions = new LinkedList<Instruction>();
+        var entryId = _idGenerator.NewId;
+        lambdaIds.Push(entryId);
+        lambdas[entryId] = instructions;
 
         while (characters.Count != 0)
         {
@@ -137,7 +140,12 @@ public class CodeParser : ICodeParser
             if (instruction is null) continue;
             instructions.AddLast(instruction);
 
-            if (instruction.Op is Operation.Lambda)
+            if (instruction.Op is Operation.WhileInit)
+            {
+                instructions.AddLast(Operation.WhileCondition);
+                instructions.AddLast(Operation.WhileBody);
+            }
+            else if (instruction.Op is Operation.Lambda)
             {
                 lambdaIds.Push(instruction.Argument);
                 lambdas[instruction.Argument] = instructions = new LinkedList<Instruction>();
@@ -147,12 +155,17 @@ public class CodeParser : ICodeParser
                 lambdaIds.Pop();
                 instructions = lambdaIds.TryPeek(out var id)
                     ? lambdas[id]
-                    : program;
+                    : throw new CodeParserException("Ret from empty stack!");
             }
         }
 
+        lambdas[entryId].AddLast(Operation.Exit);
+
+        if (lambdaIds.Count != 1)
+            throw new CodeParserException("Unbalanced Lambdas! (Missing ']')");
+
         return new Program(
-            new List<Instruction>(program),
+            entryId,
             lambdas.ToDictionary(
                 e => e.Key,
                 e => (IReadOnlyList<Instruction>)e.Value.ToList()

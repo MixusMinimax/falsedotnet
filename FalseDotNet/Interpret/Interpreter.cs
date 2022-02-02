@@ -38,14 +38,14 @@ public class Interpreter : IInterpreter
 
     public void Interpret(Program program, bool printOperations = true)
     {
-        var currentInstructions = program.Instructions;
+        var (entryId, functions) = program;
+        var currentInstructions = functions[entryId];
         long currentLambdaId = 0;
         var callStack = new Stack<(int ProgramCounter, long lambdaId)>();
 
-
         void ValidateLambdaId(long id, string where = "stack")
         {
-            if (!program.Lambdas.ContainsKey(id))
+            if (!functions.ContainsKey(id))
                 throw new InterpreterException($"Invalid lambda id on {where}");
         }
 
@@ -55,7 +55,7 @@ public class Interpreter : IInterpreter
             callStack.Push((pc, currentLambdaId));
             pc = -1;
             currentLambdaId = lambdaId;
-            currentInstructions = program.Lambdas[lambdaId];
+            currentInstructions = functions[lambdaId];
         }
 
         for (var pc = 0; pc < currentInstructions.Count; ++pc)
@@ -65,17 +65,17 @@ public class Interpreter : IInterpreter
                 _logger.WriteLine(operation.ToString().Pastel(Color.FromArgb(255, 120, 120, 120)));
             long a, b;
             long offset, condition;
-            long lambdaId;
+            long lambdaId, body;
             switch (operation)
             {
                 // Literals
-                
+
                 case Operation.IntLiteral:
                     Push(argument);
                     break;
 
                 // Stack
-                
+
                 case Operation.Dup:
                     Push(Peek());
                     break;
@@ -103,7 +103,7 @@ public class Interpreter : IInterpreter
                     break;
 
                 // Arithmetic
-                
+
                 case Operation.Add:
                     (a, b) = (Pop(), Pop());
                     Push(a + b);
@@ -145,7 +145,7 @@ public class Interpreter : IInterpreter
                     break;
 
                 // Comparison
-                
+
                 case Operation.Gt:
                     (a, b) = (Pop(), Pop());
                     Push(a < b);
@@ -166,14 +166,8 @@ public class Interpreter : IInterpreter
                     if (callStack.Count == 0)
                         throw new InterpreterException("Return from empty stack");
                     (pc, currentLambdaId) = callStack.Pop();
-                    if (callStack.Count == 0)
-                    {
-                        currentInstructions = program.Instructions;
-                        break;
-                    }
-
                     ValidateLambdaId(currentLambdaId, "callstack");
-                    currentInstructions = program.Lambdas[currentLambdaId];
+                    currentInstructions = functions[currentLambdaId];
                     break;
 
                 case Operation.Execute:
@@ -186,8 +180,43 @@ public class Interpreter : IInterpreter
                     if (condition != 0) ExecuteLambda(lambdaId, ref pc);
                     break;
 
+                case Operation.WhileInit:
+                    // Pops the body and condition lambdas from the FALSE-stack and stores them on the callstack.
+                    (body, condition) = (Pop(), Pop());
+                    callStack.Push((0, condition));
+                    callStack.Push((0, body));
+                    break;
+
+                case Operation.WhileCondition:
+                    condition =  callStack.ElementAt(1).lambdaId;
+                    ExecuteLambda(condition, ref pc);
+                    break;
+
+                case Operation.WhileBody:
+                    condition = Pop();
+                    if (condition != 0)
+                    {
+                        body = callStack.Peek().lambdaId;
+                        pc -= 2;
+                        ExecuteLambda(body, ref pc);
+                    }
+                    else
+                    {
+                        callStack.Pop();
+                        callStack.Pop();
+                    }
+
+                    break;
+
+                case Operation.Exit:
+                    // Not relevant for the interpreter.
+                    // There is no character for inserting an exit instruction,
+                    // it's automatically inserted of the main function.
+                    // In the future, the exit code could be the top of the stack, or 0 if stack is empty.
+                    return;
+
                 // Names
-                
+
                 case Operation.Ref:
                     Push(argument);
                     break;
@@ -204,7 +233,7 @@ public class Interpreter : IInterpreter
                     break;
 
                 // I/O
-                
+
                 case Operation.OutputChar:
                     a = Pop();
                     _logger.Write((char)a);

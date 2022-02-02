@@ -3,6 +3,6 @@
 namespace FalseDotNet.Parsing;
 
 public record Program(
-    IReadOnlyList<Instruction> Instructions,
-    IReadOnlyDictionary<long, IReadOnlyList<Instruction>> Lambdas
+    long EntryId,
+    IReadOnlyDictionary<long, IReadOnlyList<Instruction>> Functions 
 );
