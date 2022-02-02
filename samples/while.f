@@ -1,3 +1,5 @@
+{ Example of a nested while loop. }
+
 1[$4=~][
 	$.':,' ,
 	1[$3=~][

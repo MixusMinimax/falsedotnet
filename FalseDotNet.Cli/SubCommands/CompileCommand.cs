@@ -26,7 +26,9 @@ public class CompileCommand : ISubCommand<CompileOptions>
     {
         services.AddSingleton(_ => new CompilerConfig
         {
-            StartLabels = new List<string> { "_start", "main" }
+            StartLabels = new List<string> { "_start", "main" },
+            WriteInstructionComments = true,
+            StackSize = 65_536,
         });
         return services;
     }
