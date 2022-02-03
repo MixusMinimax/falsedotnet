@@ -9,14 +9,14 @@ public class Compiler : ICompiler
     // @formatter:int_align_assignments true
     private static readonly Dictionary<string, string> Macros = new()
     {
-        ["SYS_WRITE"]  = "1",
-        ["SYS_EXIT"]   = "60",
-        ["SYS_MMAP"]   = "9",
-        ["PROT_NONE"]  = "0b0000",
-        ["PROT_READ"]  = "0b0001",
-        ["PROT_WRITE"] = "0b0010",
-        ["PROT_EXEC"]  = "0b1000",
-        ["MAP_PRIVATE"] = "0b00000010",
+        ["SYS_WRITE"]     = "1",
+        ["SYS_EXIT"]      = "60",
+        ["SYS_MMAP"]      = "9",
+        ["PROT_NONE"]     = "0b0000",
+        ["PROT_READ"]     = "0b0001",
+        ["PROT_WRITE"]    = "0b0010",
+        ["PROT_EXEC"]     = "0b1000",
+        ["MAP_PRIVATE"]   = "0b00000010",
         ["MAP_ANONYMOUS"] = "0b00100000"
     };
 
@@ -85,6 +85,8 @@ public class Compiler : ICompiler
         {
             CompileLambda(program, output, id);
         }
+
+        WriteDecimalConverter(output);
     }
 
     private void WriteSetup(TextWriter output)
@@ -149,44 +151,114 @@ public class Compiler : ICompiler
                 break;
 
             // Stack
-            
+
             // Arithmetic
 
             case Operation.Add:
                 Pop(output, "rax");
-                Pop(output, "rbx");
-                O("    add rax, rbx");
+                Pop(output, "rdx");
+                O("    add rax, rdx");
                 Push(output, "rax");
                 break;
-            
+
             case Operation.Div:
                 Pop(output, "rbx");
                 Pop(output, "rax");
+                O("    xor rdx, rdx");
                 O("    idiv rbx");
                 Push(output, "rax");
                 break;
             
+            case Operation.Neg:
+                O("    mov rbx, [rel stack]");
+                O("    mov rcx, [rel stack_ptr]");
+                O("    dec rcx");
+                O("    mov rax, [rbx,rcx*8]");
+                O("    neg rax");
+                O("    mov [rbx,rcx*8], rax");
+                break;
+
             // I/O
-            
+
             case Operation.PrintString:
                 PrintString(output, argument);
                 break;
-            
+
             case Operation.OutputChar:
+                // In the future, write to a buffer instead, and use the flush command 'ß' to write to stdout.
+                // A syscall for every character is not efficient.
                 Pop(output, "rax");
-                O(@"    push rax");
-                O(@"    mov rax, SYS_WRITE");
-                O($"    mov rdi, 1");
-                O($"    mov rsi, rsp");
-                O($"    mov rdx, 1");
-                O(@"    syscall");
-                O(@"    add rsp, 8");
+                O("    push rax");
+                O("    mov rax, SYS_WRITE");
+                O("    mov rdi, 1");
+                O("    mov rsi, rsp");
+                O("    mov rdx, 1");
+                O("    syscall");
+                O("    add rsp, 8");
+                break;
+            
+            case Operation.OutputDecimal:
+                Pop(output, "rdi");
+                O("    call print_decimal");
                 break;
 
             case Operation.Exit:
                 Exit(output, 0); // maybe exit with top of FALSE stack?
                 break;
         }
+    }
+
+    private void WriteDecimalConverter(TextWriter output)
+    {
+        void O(string s) => output.WriteLine(s);
+        O("");
+        O("; Converts rdi to decimal and writes to stdout.");
+        O("print_decimal:");
+
+        // rax: number, rsi: isNegative, rbx: string base, rcx: string index
+        // rdx: modulo
+
+        // 1. take the absolute and remember if number was negative.
+        O("    mov rax, rdi");
+        O("    neg rdi");
+        O("    mov r11, 0");
+        O("    mov rdx, -1");
+        O("    cmp rax, 0");
+        O("    cmovl r11, rdx");
+        O("    cmovl rax, rdi");
+
+        // 2. Convert to decimal and store in string_buffer. (right to left)
+        //    Count decimal places.
+        O("    mov rdi, 10");
+        O("    lea r8, [rel string_buffer]");
+        O($"    mov rcx, 0x{_config.StringBufferSize:x8}"); // Start at the end
+        O("print_decimal_loop:");
+        O("    dec rcx");
+        O("    xor rdx, rdx");
+        O("    div rdi"); // digit in rdx
+        O("    add dl, '0'");
+        O("    mov [r8,rcx], dl");
+        O("    cmp rax, 0");
+        O("    jne print_decimal_loop");
+
+        // 3. Write '-' in front if number was negative.
+        //    also, increment length counter
+        O("    cmp r11, 0");
+        O("    je print_decimal_skip");
+        O("    dec rcx");
+        O("    mov dl, '-'");
+        O("    mov [r8,rcx], dl");
+        O("print_decimal_skip:");
+        
+        // 4. Pass string_buffer+32-length as pointer, length to write syscall.
+        O("    add r8, rcx");
+        O($"    mov rdx, 0x{_config.StringBufferSize:x8}");
+        O("    sub rdx, rcx");
+        O("    mov rax, SYS_WRITE");
+        O("    mov rdi, 1");
+        O("    mov rsi, r8");
+        O("    syscall");
+        O("    ret");
     }
 
     /*****************************************\
@@ -251,6 +323,7 @@ public class Compiler : ICompiler
         O("; Uninitialized Globals:");
         O("    section .bss");
         O("stack: RESQ 1");
+        O("string_buffer: RESB 32");
     }
 
     private static void WriteData(TextWriter output)

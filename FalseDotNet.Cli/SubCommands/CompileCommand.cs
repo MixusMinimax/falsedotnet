@@ -29,6 +29,7 @@ public class CompileCommand : ISubCommand<CompileOptions>
             StartLabels = new List<string> { "_start", "main" },
             WriteInstructionComments = true,
             StackSize = 65_536,
+            StringBufferSize = 32,
         });
         return services;
     }

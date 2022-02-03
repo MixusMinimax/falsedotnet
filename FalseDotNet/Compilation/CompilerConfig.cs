@@ -16,4 +16,9 @@ public class CompilerConfig
     /// Size of the FALSE stack. Grows downwards.
     /// </summary>
     public long StackSize { get; set; } = 65_536;
+
+    /// <summary>
+    /// The size of the buffer used for number-to-string conversion.
+    /// </summary>
+    public long StringBufferSize { get; set; } = 32;
 }
