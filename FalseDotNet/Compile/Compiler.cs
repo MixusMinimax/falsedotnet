@@ -28,11 +28,13 @@ public class Compiler : ICompiler
 
     private readonly ILogger _logger;
     private readonly CompilerConfig _config;
+    private readonly IIdGenerator _idGenerator;
 
-    public Compiler(ILogger logger, CompilerConfig config)
+    public Compiler(ILogger logger, CompilerConfig config, IIdGenerator idGenerator)
     {
         _logger = logger;
         _config = config;
+        _idGenerator = idGenerator;
     }
 
     public void Compile(Program program, TextWriter output)
@@ -58,6 +60,9 @@ public class Compiler : ICompiler
 
     private static string GetStringLenLabel(long id) =>
         $"len_{id:D3}";
+
+    private string GenerateNewLabel() =>
+        $"_local_{_idGenerator.NewId:D3}";
 
     private static void WriteHeader(TextWriter output)
     {
@@ -131,11 +136,11 @@ public class Compiler : ICompiler
         var lambda = program.Functions[lambdaId];
         foreach (var instruction in lambda)
         {
-            CompileInstruction(instruction, output);
+            CompileInstruction(program, instruction, output);
         }
     }
 
-    private void CompileInstruction(Instruction instruction, TextWriter output)
+    private void CompileInstruction(Program program, Instruction instruction, TextWriter output)
     {
         void O(string s) => output.WriteLine(s);
         if (_config.WriteInstructionComments)
@@ -152,30 +157,115 @@ public class Compiler : ICompiler
 
             // Stack
 
+            case Operation.Dup:
+                Peek(output, "rax");
+                Push(output, "rax");
+                break;
+
             // Arithmetic
 
             case Operation.Add:
                 Pop(output, "rax");
-                Pop(output, "rdx");
+                Peek(output, "rdx");
                 O("    add rax, rdx");
-                Push(output, "rax");
+                Replace(output, "rax");
+                break;
+
+            case Operation.Sub:
+                Pop(output, "rax");
+                Peek(output, "rdx");
+                O("    sub rdx, rax");
+                Replace(output, "rdx");
+                break;
+
+            case Operation.Mul:
+                Pop(output, "rax");
+                Peek(output, "rdx");
+                O("    imul rax, rdx");
+                Replace(output, "rax");
                 break;
 
             case Operation.Div:
-                Pop(output, "rbx");
-                Pop(output, "rax");
+                Pop(output, "rdi");
+                Peek(output, "rax");
                 O("    xor rdx, rdx");
-                O("    idiv rbx");
+                O("    mov rsi, rdx");
+                O("    not rsi");
+                O("    cmp rax, 0");
+                O("    cmovl rdx, rsi");
+                O("    idiv rdi");
+                Replace(output, "rax");
+                break;
+
+            case Operation.Neg:
+                Peek(output, "rax");
+                O("    neg rax");
+                Replace(output, "rax");
+                break;
+
+            case Operation.Not:
+                Peek(output, "rax");
+                O("    not rax");
+                Replace(output, "rax");
+                break;
+
+            // Comparison
+
+            case Operation.Eq:
+                Pop(output, "rax");
+                Peek(output, "rdx");
+                O("    cmp rax, rdx");
+                O("    mov rax, 0");
+                O("    mov rdx, 0xffffffffffffffff");
+                O("    cmove rax, rdx");
+                Replace(output, "rax");
+                break;
+
+            // Control Flow and Lambdas
+
+            case Operation.Lambda:
+                O($"    lea rax, [rel {GetLabel(program, argument)}]");
                 Push(output, "rax");
                 break;
-            
-            case Operation.Neg:
-                O("    mov rbx, [rel stack]");
-                O("    mov rcx, [rel stack_ptr]");
-                O("    dec rcx");
-                O("    mov rax, [rbx,rcx*8]");
-                O("    neg rax");
-                O("    mov [rbx,rcx*8], rax");
+
+            case Operation.Ret:
+                O("    ret");
+                break;
+
+            case Operation.Execute:
+                Pop(output, "rax");
+                O($"    call rax");
+                break;
+
+            case Operation.ConditionalExecute:
+                var label = GenerateNewLabel();
+                Pop(output, "rax"); // lambda
+                Pop(output, "rdx"); // condition
+                O(@"    cmp rdx, 0");
+                O($"    jz {label}");
+                O(@"    call rax");
+                O($"{label}:");
+                break;
+
+            // Names
+
+            case Operation.Ref:
+                O($"    mov rax, {argument}");
+                Push(output, "rax");
+                break;
+
+            case Operation.Store:
+                Pop(output, "rax");
+                Pop(output, "rdx");
+                O("    lea rbx, [rel references]");
+                O("    mov [rbx,rax*8], rdx");
+                break;
+
+            case Operation.Load:
+                Pop(output, "rax");
+                O("    lea rbx, [rel references]");
+                O("    mov rdx, [rbx,rax*8]");
+                Push(output, "rdx");
                 break;
 
             // I/O
@@ -196,7 +286,7 @@ public class Compiler : ICompiler
                 O("    syscall");
                 O("    add rsp, 8");
                 break;
-            
+
             case Operation.OutputDecimal:
                 Pop(output, "rdi");
                 O("    call print_decimal");
@@ -249,7 +339,7 @@ public class Compiler : ICompiler
         O("    mov dl, '-'");
         O("    mov [r8,rcx], dl");
         O("print_decimal_skip:");
-        
+
         // 4. Pass string_buffer+32-length as pointer, length to write syscall.
         O("    add r8, rcx");
         O($"    mov rdx, 0x{_config.StringBufferSize:x8}");
@@ -313,10 +403,22 @@ public class Compiler : ICompiler
         O(@"    mov [rel stack_ptr], rcx");
     }
 
+    private static void Replace(TextWriter output, string register)
+    {
+        void O(string s) => output.WriteLine(s);
+        O(@"    mov rbx, [rel stack]");
+        O(@"    mov rcx, [rel stack_ptr]");
+        O(@"    dec rcx");
+        O($"    mov [rbx,rcx*8], {register}");
+    }
+
     private static void Peek(TextWriter output, string register)
     {
         void O(string s) => output.WriteLine(s);
-        // TODO
+        O(@"    mov rbx, [rel stack]");
+        O(@"    mov rcx, [rel stack_ptr]");
+        O(@"    dec rcx");
+        O($"    mov {register}, [rbx,rcx*8]");
     }
 
     /*****************************************\
@@ -328,6 +430,7 @@ public class Compiler : ICompiler
         void O(string s) => output.WriteLine(s);
         O("; Uninitialized Globals:");
         O("    section .bss");
+        O("references: RESQ 32");
         O("stack: RESQ 1");
         O("string_buffer: RESB 32");
     }

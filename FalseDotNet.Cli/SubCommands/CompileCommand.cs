@@ -82,6 +82,7 @@ public class CompileCommand : ISubCommand<CompileOptions>
             _executor.Link(objectPath, binaryPath);
         }
 
+        _logger.WriteLine("Done!".Pastel(Color.Green));
         return 0;
     }
 }

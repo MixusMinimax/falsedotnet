@@ -1,4 +1,4 @@
 { Print characters }
 
 
-"Hello, World! Number: ("123.")"10,
+"Hello, World! Number: ("29000 420/.")"10,
