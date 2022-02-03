@@ -143,9 +143,12 @@ public class Compiler : ICompiler
     private void CompileInstruction(Program program, Instruction instruction, TextWriter output)
     {
         void O(string s) => output.WriteLine(s);
+        var (operation, argument) = instruction;
+        if (operation is Operation.WhileCondition or Operation.WhileBody)
+            return;
         if (_config.WriteInstructionComments)
             O($"    ; -- {instruction} --");
-        var (operation, argument) = instruction;
+
         switch (operation)
         {
             // Literals
@@ -160,6 +163,10 @@ public class Compiler : ICompiler
             case Operation.Dup:
                 Peek(output, "rax");
                 Push(output, "rax");
+                break;
+            
+            case Operation.Drop:
+                Drop(output);
                 break;
 
             // Arithmetic
@@ -239,12 +246,32 @@ public class Compiler : ICompiler
 
             case Operation.ConditionalExecute:
                 var label = GenerateNewLabel();
-                Pop(output, "rax"); // lambda
+                Pop(output, "rax"); // body
                 Pop(output, "rdx"); // condition
                 O(@"    cmp rdx, 0");
                 O($"    jz {label}");
                 O(@"    call rax");
                 O($"{label}:");
+                break;
+
+            case Operation.WhileInit:
+                Pop(output, "rax"); // body
+                O("    push rax");
+                Pop(output, "rax"); // condition
+                O("    push rax");
+                var loop = GenerateNewLabel();
+                var condition = GenerateNewLabel();
+                O($"    jmp {condition}");
+                O($"{loop}:");
+                O(@"    mov rax, [rsp+8]");
+                O(@"    call rax");
+                O($"{condition}:");
+                O(@"    mov rax, [rsp]");
+                O(@"    call rax");
+                Pop(output, "rax");
+                O(@"    cmp rax, 0");
+                O($"    jnz {loop}");
+                O(@"    add rsp, 16");
                 break;
 
             // Names
@@ -400,6 +427,14 @@ public class Compiler : ICompiler
         O(@"    mov rcx, [rel stack_ptr]");
         O(@"    dec rcx");
         O($"    mov {register}, [rbx,rcx*8]");
+        O(@"    mov [rel stack_ptr], rcx");
+    }
+    
+    private static void Drop(TextWriter output)
+    {
+        void O(string s) => output.WriteLine(s);
+        O(@"    mov rcx, [rel stack_ptr]");
+        O(@"    dec rcx");
         O(@"    mov [rel stack_ptr], rcx");
     }
 
