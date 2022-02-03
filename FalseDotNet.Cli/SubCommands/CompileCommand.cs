@@ -1,6 +1,7 @@
 ﻿using System.Drawing;
 using System.Text.RegularExpressions;
-using FalseDotNet.Cli.ParserExtensions;
+using FalseDotNet.Binary;
+using FalseDotNet.Cli.SubCommandExtensions;
 using FalseDotNet.Compile;
 using FalseDotNet.Parse;
 using FalseDotNet.Utility;
@@ -14,12 +15,14 @@ public class CompileCommand : ISubCommand<CompileOptions>
     private readonly ILogger _logger;
     private readonly ICodeParser _codeParser;
     private readonly ICompiler _compiler;
+    private readonly ILinuxExecutor _executor;
 
-    public CompileCommand(ILogger logger, ICodeParser codeParser, ICompiler compiler)
+    public CompileCommand(ILogger logger, ICodeParser codeParser, ICompiler compiler, ILinuxExecutor executor)
     {
         _logger = logger;
         _codeParser = codeParser;
         _compiler = compiler;
+        _executor = executor;
     }
 
     public static IServiceCollection RegisterServices(IServiceCollection services)
@@ -41,7 +44,9 @@ public class CompileCommand : ISubCommand<CompileOptions>
         if (Path.GetFullPath(opts.InputPath) == Path.GetFullPath(opts.OutputPath))
             throw new ArgumentException("Input and Output path point to the same file!");
         new FileInfo(opts.OutputPath).Directory?.Create();
-        _logger.WriteLine($"Compiling [{opts.InputPath}] into [{opts.OutputPath}].".Pastel(Color.Aqua));
+
+        var objectPath = Regex.Replace(opts.OutputPath, @"\.asm$", ".o");
+        var binaryPath = Regex.Replace(opts.OutputPath, @"\.asm$", "");
 
         try
         {
@@ -49,6 +54,8 @@ public class CompileCommand : ISubCommand<CompileOptions>
             var code = sr.ReadToEnd();
             var parsedCode = _codeParser.Parse(code);
             using var output = new StreamWriter(opts.OutputPath);
+
+            _logger.WriteLine($"Compiling [{opts.InputPath}] into [{opts.OutputPath}].".Pastel(Color.Aqua));
             _compiler.Compile(parsedCode, output);
         }
         catch (CompilerException exception)
@@ -61,6 +68,18 @@ public class CompileCommand : ISubCommand<CompileOptions>
             _logger.WriteLine($"Exception while reading [{opts.InputPath}]:".Pastel(Color.IndianRed));
             _logger.WriteLine(e.Message.Pastel(Color.IndianRed));
             return 1;
+        }
+
+        if (opts.Assemble)
+        {
+            _logger.WriteLine($"Assembling [{opts.OutputPath}] into [{objectPath}].".Pastel(Color.Aqua));
+            _executor.Assemble(opts.OutputPath, objectPath);
+        }
+
+        if (opts.Link)
+        {
+            _logger.WriteLine($"Linking [{objectPath}] into [{binaryPath}].".Pastel(Color.Aqua));
+            _executor.Link(objectPath, binaryPath);
         }
 
         return 0;

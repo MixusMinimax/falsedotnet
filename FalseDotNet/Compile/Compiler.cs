@@ -35,7 +35,7 @@ public class Compiler : ICompiler
         _config = config;
     }
 
-    public void Compile(Program program, StreamWriter output)
+    public void Compile(Program program, TextWriter output)
     {
         WriteHeader(output);
         output.WriteLine('\n');
@@ -311,6 +311,12 @@ public class Compiler : ICompiler
         O(@"    dec rcx");
         O($"    mov {register}, [rbx,rcx*8]");
         O(@"    mov [rel stack_ptr], rcx");
+    }
+
+    private static void Peek(TextWriter output, string register)
+    {
+        void O(string s) => output.WriteLine(s);
+        // TODO
     }
 
     /*****************************************\

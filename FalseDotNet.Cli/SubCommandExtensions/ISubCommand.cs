@@ -1,4 +1,4 @@
-﻿namespace FalseDotNet.Cli.ParserExtensions;
+﻿namespace FalseDotNet.Cli.SubCommandExtensions;
 
 public interface ISubCommand<in TOptions>
 {

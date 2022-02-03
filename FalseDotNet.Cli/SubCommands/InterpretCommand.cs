@@ -1,5 +1,5 @@
 ﻿using System.Drawing;
-using FalseDotNet.Cli.ParserExtensions;
+using FalseDotNet.Cli.SubCommandExtensions;
 using FalseDotNet.Interpret;
 using FalseDotNet.Parse;
 using FalseDotNet.Utility;

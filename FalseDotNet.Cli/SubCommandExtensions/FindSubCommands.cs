@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Pastel;
 
-namespace FalseDotNet.Cli.ParserExtensions;
+namespace FalseDotNet.Cli.SubCommandExtensions;
 
 public static class FindSubCommands
 {

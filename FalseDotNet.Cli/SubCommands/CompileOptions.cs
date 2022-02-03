@@ -10,4 +10,10 @@ public class CompileOptions
 
     [Option('o', "output", MetaValue = "PATH", HelpText = "File path to write assembly to. Defaults to '<input>.asm'.")]
     public string OutputPath { get; set; } = default!;
+
+    [Option('a', "assemble", HelpText = "Assemble using nasm.")]
+    public bool Assemble { get; set; }
+
+    [Option('l', "link", HelpText = "Link using ld.")]
+    public bool Link { get; set; }
 }

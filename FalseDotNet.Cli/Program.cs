@@ -1,6 +1,7 @@
 ﻿using CommandLine;
+using FalseDotNet.Binary;
 using FalseDotNet.Cli;
-using FalseDotNet.Cli.ParserExtensions;
+using FalseDotNet.Cli.SubCommandExtensions;
 using FalseDotNet.Compile;
 using FalseDotNet.Interpret;
 using FalseDotNet.Parse;
@@ -11,6 +12,8 @@ return new ServiceCollection()
     .RegisterSubCommands(typeof(Program))
     .AddSingleton<ILogger, DefaultLogger>()
     .AddTransient<IIdGenerator, IncrementingIdGenerator>()
+    .AddSingleton<IPathConverter, PathConverter>()
+    .AddSingleton<ILinuxExecutor, LinuxExecutor>()
     .AddTransient<ICodeParser, CodeParser>()
     .AddTransient<IInterpreter, Interpreter>()
     .AddTransient<ICompiler, Compiler>()
