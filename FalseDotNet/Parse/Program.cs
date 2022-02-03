@@ -1,6 +1,6 @@
-﻿using FalseDotNet.Operations;
+﻿using FalseDotNet.Instructions;
 
-namespace FalseDotNet.Parsing;
+namespace FalseDotNet.Parse;
 
 public record Program(
     long EntryId,

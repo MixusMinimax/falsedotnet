@@ -1,4 +1,4 @@
-﻿namespace FalseDotNet.Compilation;
+﻿namespace FalseDotNet.Compile;
 
 public class CompilerException : Exception
 {

@@ -1,4 +1,4 @@
-﻿using FalseDotNet.Parsing;
+﻿using FalseDotNet.Parse;
 
 namespace FalseDotNet.Interpret;
 

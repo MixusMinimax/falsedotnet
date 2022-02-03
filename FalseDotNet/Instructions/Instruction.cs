@@ -1,4 +1,4 @@
-﻿namespace FalseDotNet.Operations;
+﻿namespace FalseDotNet.Instructions;
 
 public record Instruction(Operation Op, long Argument = 0)
 {

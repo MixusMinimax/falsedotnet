@@ -1,6 +1,6 @@
 ﻿using System.Drawing;
-using FalseDotNet.Operations;
-using FalseDotNet.Parsing;
+using FalseDotNet.Instructions;
+using FalseDotNet.Parse;
 using FalseDotNet.Utility;
 using Pastel;
 

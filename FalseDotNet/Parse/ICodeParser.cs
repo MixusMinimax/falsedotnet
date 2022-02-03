@@ -1,6 +1,4 @@
-﻿using FalseDotNet.Operations;
-
-namespace FalseDotNet.Parsing;
+﻿namespace FalseDotNet.Parse;
 
 public interface ICodeParser
 {

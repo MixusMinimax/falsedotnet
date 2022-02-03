@@ -1,9 +1,9 @@
 ﻿using System.Text;
 using System.Text.RegularExpressions;
-using FalseDotNet.Operations;
+using FalseDotNet.Instructions;
 using FalseDotNet.Utility;
 
-namespace FalseDotNet.Parsing;
+namespace FalseDotNet.Parse;
 
 public class CodeParser : ICodeParser
 {

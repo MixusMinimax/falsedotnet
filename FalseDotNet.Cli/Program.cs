@@ -1,9 +1,9 @@
 ﻿using CommandLine;
 using FalseDotNet.Cli;
 using FalseDotNet.Cli.ParserExtensions;
-using FalseDotNet.Compilation;
+using FalseDotNet.Compile;
 using FalseDotNet.Interpret;
-using FalseDotNet.Parsing;
+using FalseDotNet.Parse;
 using FalseDotNet.Utility;
 using Microsoft.Extensions.DependencyInjection;
 

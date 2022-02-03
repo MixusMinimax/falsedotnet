@@ -1,6 +1,6 @@
-﻿using FalseDotNet.Parsing;
+﻿using FalseDotNet.Parse;
 
-namespace FalseDotNet.Compilation;
+namespace FalseDotNet.Compile;
 
 public interface ICompiler
 {

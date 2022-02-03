@@ -1,8 +1,8 @@
 ﻿using System.Drawing;
 using System.Text.RegularExpressions;
 using FalseDotNet.Cli.ParserExtensions;
-using FalseDotNet.Compilation;
-using FalseDotNet.Parsing;
+using FalseDotNet.Compile;
+using FalseDotNet.Parse;
 using FalseDotNet.Utility;
 using Microsoft.Extensions.DependencyInjection;
 using Pastel;

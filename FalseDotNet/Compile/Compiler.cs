@@ -1,8 +1,8 @@
-﻿using FalseDotNet.Operations;
-using FalseDotNet.Parsing;
+﻿using FalseDotNet.Instructions;
+using FalseDotNet.Parse;
 using FalseDotNet.Utility;
 
-namespace FalseDotNet.Compilation;
+namespace FalseDotNet.Compile;
 
 public class Compiler : ICompiler
 {
