@@ -16,6 +16,8 @@ public class Compiler : ICompiler
         ["PROT_READ"]  = "0b0001",
         ["PROT_WRITE"] = "0b0010",
         ["PROT_EXEC"]  = "0b1000",
+        ["MAP_PRIVATE"] = "0b00000010",
+        ["MAP_ANONYMOUS"] = "0b00100000"
     };
 
     private static readonly Dictionary<string, string> Strings = new()
@@ -94,8 +96,8 @@ public class Compiler : ICompiler
         O(@"    mov rdi, 0");
         O($"    mov rsi, 0x{_config.StackSize:x8}");
         O(@"    mov rdx, PROT_READ | PROT_WRITE");
-        O(@"    mov rcx, 0");
-        O(@"    mov r8, 0");
+        O(@"    mov r10, MAP_PRIVATE | MAP_ANONYMOUS");
+        O(@"    mov r8, -1");
         O(@"    mov r9, 0");
         O(@"    syscall");
         O(@"    ; Check for mmap success");
@@ -139,8 +141,46 @@ public class Compiler : ICompiler
         var (operation, argument) = instruction;
         switch (operation)
         {
+            // Literals
+
+            case Operation.IntLiteral:
+                O($"    mov rax, 0x{argument:x8}");
+                Push(output, "rax");
+                break;
+
+            // Stack
+            
+            // Arithmetic
+
+            case Operation.Add:
+                Pop(output, "rax");
+                Pop(output, "rbx");
+                O("    add rax, rbx");
+                Push(output, "rax");
+                break;
+            
+            case Operation.Div:
+                Pop(output, "rbx");
+                Pop(output, "rax");
+                O("    idiv rbx");
+                Push(output, "rax");
+                break;
+            
+            // I/O
+            
             case Operation.PrintString:
                 PrintString(output, argument);
+                break;
+            
+            case Operation.OutputChar:
+                Pop(output, "rax");
+                O(@"    push rax");
+                O(@"    mov rax, SYS_WRITE");
+                O($"    mov rdi, 1");
+                O($"    mov rsi, rsp");
+                O($"    mov rdx, 1");
+                O(@"    syscall");
+                O(@"    add rsp, 8");
                 break;
 
             case Operation.Exit:
@@ -181,6 +221,26 @@ public class Compiler : ICompiler
         O(@"    syscall");
     }
 
+    private static void Push(TextWriter output, string register)
+    {
+        void O(string s) => output.WriteLine(s);
+        O(@"    mov rbx, [rel stack]");
+        O(@"    mov rcx, [rel stack_ptr]");
+        O($"    mov [rbx,rcx*8], {register}");
+        O(@"    inc rcx");
+        O(@"    mov [rel stack_ptr], rcx");
+    }
+
+    private static void Pop(TextWriter output, string register)
+    {
+        void O(string s) => output.WriteLine(s);
+        O(@"    mov rbx, [rel stack]");
+        O(@"    mov rcx, [rel stack_ptr]");
+        O(@"    dec rcx");
+        O($"    mov {register}, [rbx,rcx*8]");
+        O(@"    mov [rel stack_ptr], rcx");
+    }
+
     /*****************************************\
      *             Data Sections             *
      *****************************************/
@@ -190,7 +250,7 @@ public class Compiler : ICompiler
         void O(string s) => output.WriteLine(s);
         O("; Uninitialized Globals:");
         O("    section .bss");
-        O("stack: resq 1");
+        O("stack: RESQ 1");
     }
 
     private static void WriteData(TextWriter output)
@@ -198,6 +258,7 @@ public class Compiler : ICompiler
         void O(string s) => output.WriteLine(s);
         O("; Globals:");
         O("    section .data");
+        O("stack_ptr: DQ 0");
     }
 
     private static void WriteRoData(Program program, TextWriter output)
