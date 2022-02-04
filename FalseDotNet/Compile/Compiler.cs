@@ -164,68 +164,121 @@ public class Compiler : ICompiler
                 Peek(output, "rax");
                 Push(output, "rax");
                 break;
-            
+
             case Operation.Drop:
                 Drop(output);
                 break;
+
+            case Operation.Swap:
+                O(@"    mov rbx, [rel stack]");
+                O(@"    mov rcx, [rel stack_ptr]");
+                O(@"    mov rax, [rbx+(rcx-1)*8]");
+                O(@"    mov rdx, [rbx+(rcx-2)*8]");
+                O(@"    mov [rbx+(rcx-1)*8], rdx");
+                O(@"    mov [rbx+(rcx-2)*8], rax");
+                break;
+
+            case Operation.Rot:
+                O(@"    mov rbx, [rel stack]");
+                O(@"    mov rcx, [rel stack_ptr]");
+                O(@"    mov rax, [rbx+(rcx-1)*8]");
+                O(@"    mov rdx, [rbx+(rcx-2)*8]");
+                O(@"    mov rsi, [rbx+(rcx-3)*8]");
+                O(@"    mov [rbx+(rcx-1)*8], rsi");
+                O(@"    mov [rbx+(rcx-2)*8], rax");
+                O(@"    mov [rbx+(rcx-3)*8], rdx");
+                break;
+
+            case Operation.Pick:
+                Peek(output, "rax"); // Offset
+                O("    mov rsi, rcx");
+                O("    sub rsi, rax");
+                O("    mov rax, [rbx+(rsi-2)*8]");
+                O("    mov [rbx+(rcx-1)*8], rax");
+                break;
+
 
             // Arithmetic
 
             case Operation.Add:
                 Pop(output, "rax");
-                Peek(output, "rdx");
+                O(@"    mov rdx, [rbx+(rcx-1)*8]");
                 O("    add rax, rdx");
-                Replace(output, "rax");
+                O("    mov [rbx+(rcx-1)*8], rax");
                 break;
 
             case Operation.Sub:
                 Pop(output, "rax");
-                Peek(output, "rdx");
+                O(@"    mov rdx, [rbx+(rcx-1)*8]");
                 O("    sub rdx, rax");
-                Replace(output, "rdx");
+                O("    mov [rbx+(rcx-1)*8], rdx");
                 break;
 
             case Operation.Mul:
                 Pop(output, "rax");
-                Peek(output, "rdx");
+                O(@"    mov rdx, [rbx+(rcx-1)*8]");
                 O("    imul rax, rdx");
-                Replace(output, "rax");
+                O("    mov [rbx+(rcx-1)*8], rax");
                 break;
 
             case Operation.Div:
                 Pop(output, "rdi");
-                Peek(output, "rax");
+                O(@"    mov rax, [rbx+(rcx-1)*8]");
                 O("    xor rdx, rdx");
                 O("    mov rsi, rdx");
                 O("    not rsi");
                 O("    cmp rax, 0");
                 O("    cmovl rdx, rsi");
                 O("    idiv rdi");
-                Replace(output, "rax");
+                O("    mov [rbx+(rcx-1)*8], rax");
                 break;
 
             case Operation.Neg:
                 Peek(output, "rax");
                 O("    neg rax");
-                Replace(output, "rax");
+                O("    mov [rbx+(rcx-1)*8], rax");
+                break;
+
+            case Operation.And:
+                Pop(output, "rax");
+                O(@"    mov rdx, [rbx+(rcx-1)*8]");
+                O("    and rax, rdx");
+                O("    mov [rbx+(rcx-1)*8], rax");
+                break;
+            
+            case Operation.Or:
+                Pop(output, "rax");
+                O(@"    mov rdx, [rbx+(rcx-1)*8]");
+                O("    or rax, rdx");
+                O("    mov [rbx+(rcx-1)*8], rax");
                 break;
 
             case Operation.Not:
                 Peek(output, "rax");
                 O("    not rax");
-                Replace(output, "rax");
+                O("    mov [rbx+(rcx-1)*8], rax");
                 break;
 
             // Comparison
 
             case Operation.Eq:
                 Pop(output, "rax");
-                Peek(output, "rdx");
+                O(@"    mov rdx, [rbx+(rcx-1)*8]");
                 O("    cmp rax, rdx");
                 O("    mov rax, 0");
                 O("    mov rdx, 0xffffffffffffffff");
                 O("    cmove rax, rdx");
-                Replace(output, "rax");
+                O("    mov [rbx+(rcx-1)*8], rax");
+                break;
+            
+            case Operation.Gt:
+                Pop(output, "rax");
+                O(@"    mov rdx, [rbx+(rcx-1)*8]");
+                O("    cmp rax, rdx");
+                O("    mov rax, 0");
+                O("    mov rdx, 0xffffffffffffffff");
+                O("    cmovl rax, rdx");
+                O("    mov [rbx+(rcx-1)*8], rax");
                 break;
 
             // Control Flow and Lambdas
@@ -285,14 +338,14 @@ public class Compiler : ICompiler
                 Pop(output, "rax");
                 Pop(output, "rdx");
                 O("    lea rbx, [rel references]");
-                O("    mov [rbx,rax*8], rdx");
+                O("    mov [rbx+rax*8], rdx");
                 break;
 
             case Operation.Load:
-                Pop(output, "rax");
+                Peek(output, "rax");
                 O("    lea rbx, [rel references]");
-                O("    mov rdx, [rbx,rax*8]");
-                Push(output, "rdx");
+                O("    mov rdx, [rbx+rax*8]");
+                Replace(output, "rdx");
                 break;
 
             // I/O
@@ -322,6 +375,9 @@ public class Compiler : ICompiler
             case Operation.Exit:
                 Exit(output, 0); // maybe exit with top of FALSE stack?
                 break;
+            
+            case Operation.WhileCondition or Operation.WhileBody:
+                throw new Exception("Unreachable");
         }
     }
 
@@ -429,7 +485,7 @@ public class Compiler : ICompiler
         O($"    mov {register}, [rbx,rcx*8]");
         O(@"    mov [rel stack_ptr], rcx");
     }
-    
+
     private static void Drop(TextWriter output)
     {
         void O(string s) => output.WriteLine(s);
@@ -443,8 +499,7 @@ public class Compiler : ICompiler
         void O(string s) => output.WriteLine(s);
         O(@"    mov rbx, [rel stack]");
         O(@"    mov rcx, [rel stack_ptr]");
-        O(@"    dec rcx");
-        O($"    mov [rbx,rcx*8], {register}");
+        O($"    mov [rbx+(rcx-1)*8], {register}");
     }
 
     private static void Peek(TextWriter output, string register)
@@ -452,8 +507,7 @@ public class Compiler : ICompiler
         void O(string s) => output.WriteLine(s);
         O(@"    mov rbx, [rel stack]");
         O(@"    mov rcx, [rel stack_ptr]");
-        O(@"    dec rcx");
-        O($"    mov {register}, [rbx,rcx*8]");
+        O($"    mov {register}, [rbx+(rcx-1)*8]");
     }
 
     /*****************************************\
