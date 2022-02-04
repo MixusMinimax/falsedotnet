@@ -27,7 +27,7 @@ public class LinuxExecutor : ILinuxExecutor
 
         if (OperatingSystem.IsWindows())
         {
-            startInfo.FileName = @"C:\Windows\system32\bash.exe";
+            startInfo.FileName = @"bash.exe";
             startInfo.Arguments =
                 "-c " + $"{fileName} {arguments}".Escape();
         }
