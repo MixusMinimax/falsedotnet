@@ -1,4 +1,4 @@
-﻿using FalseDotNet.Instructions;
+﻿using FalseDotNet.Commands;
 using FalseDotNet.Parse;
 using FalseDotNet.Utility;
 
@@ -136,20 +136,20 @@ public class Compiler : ICompiler
         }
 
         var lambda = program.Functions[lambdaId];
-        foreach (var instruction in lambda)
+        foreach (var command in lambda)
         {
-            CompileInstruction(program, instruction, output);
+            CompileCommand(program, command, output);
         }
     }
 
-    private void CompileInstruction(Program program, Instruction instruction, TextWriter output)
+    private void CompileCommand(Program program, Command command, TextWriter output)
     {
         void O(string s) => output.WriteLine(s);
-        var (operation, argument) = instruction;
+        var (operation, argument) = command;
         if (operation is Operation.WhileCondition or Operation.WhileBody)
             return;
-        if (_config.WriteInstructionComments)
-            O($"    ; -- {instruction} --");
+        if (_config.WriteCommandComments)
+            O($"    ; -- {command} --");
 
         switch (operation)
         {
@@ -357,18 +357,6 @@ public class Compiler : ICompiler
                 break;
 
             case Operation.OutputChar:
-                // In the future, write to a buffer instead, and use the flush command 'ß' to write to stdout.
-                // A syscall for every character is not efficient.
-                /*
-                Pop(output, "rax");
-                O("    push rax");
-                O("    mov rax, SYS_WRITE");
-                O("    mov rdi, 1");
-                O("    mov rsi, rsp");
-                O("    mov rdx, 1");
-                O("    syscall");
-                O("    add rsp, 8");
-                */
                 Pop(output, "rdi");
                 O("    call print_character");
                 break;
@@ -387,7 +375,7 @@ public class Compiler : ICompiler
                 break;
             
             case Operation.WhileCondition or Operation.WhileBody:
-                throw new Exception("Unreachable");
+                throw new CompilerException("Unreachable");
         }
     }
 

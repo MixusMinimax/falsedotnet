@@ -10,7 +10,7 @@ public class CompilerConfig
     /// <summary>
     /// If true, insert the Operations as comments into the assembly code.
     /// </summary>
-    public bool WriteInstructionComments { get; set; } = true;
+    public bool WriteCommandComments { get; set; } = true;
 
     /// <summary>
     /// Size of the FALSE stack. Grows downwards.

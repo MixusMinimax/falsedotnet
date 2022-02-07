@@ -1,4 +1,4 @@
-﻿namespace FalseDotNet.Instructions;
+﻿namespace FalseDotNet.Commands;
 
 public enum Operation
 {

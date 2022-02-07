@@ -1,5 +1,5 @@
 ﻿using System.Drawing;
-using FalseDotNet.Instructions;
+using FalseDotNet.Commands;
 using FalseDotNet.Parse;
 using FalseDotNet.Utility;
 using Pastel;
@@ -39,7 +39,7 @@ public class Interpreter : IInterpreter
     public void Interpret(Program program, bool printOperations = true)
     {
         var (entryId, functions, strings) = program;
-        var currentInstructions = functions[entryId];
+        var currentCommands = functions[entryId];
         long currentLambdaId = 0;
         var callStack = new Stack<(int ProgramCounter, long lambdaId)>();
 
@@ -55,14 +55,14 @@ public class Interpreter : IInterpreter
             callStack.Push((pc, currentLambdaId));
             pc = -1;
             currentLambdaId = lambdaId;
-            currentInstructions = functions[lambdaId];
+            currentCommands = functions[lambdaId];
         }
 
-        for (var pc = 0; pc < currentInstructions.Count; ++pc)
+        for (var pc = 0; pc < currentCommands.Count; ++pc)
         {
-            var (operation, argument) = currentInstructions[pc];
+            var (operation, argument) = currentCommands[pc];
             if (printOperations)
-                _logger.WriteLine(currentInstructions[pc].ToString().Pastel(Color.FromArgb(255, 120, 120, 120)));
+                _logger.WriteLine(currentCommands[pc].ToString().Pastel(Color.FromArgb(255, 120, 120, 120)));
             long a, b;
             long offset, condition;
             long lambdaId, body;
@@ -167,7 +167,7 @@ public class Interpreter : IInterpreter
                         throw new InterpreterException("Return from empty stack");
                     (pc, currentLambdaId) = callStack.Pop();
                     ValidateLambdaId(currentLambdaId, "callstack");
-                    currentInstructions = functions[currentLambdaId];
+                    currentCommands = functions[currentLambdaId];
                     break;
 
                 case Operation.Execute:
@@ -210,7 +210,7 @@ public class Interpreter : IInterpreter
 
                 case Operation.Exit:
                     // Not relevant for the interpreter.
-                    // There is no character for inserting an exit instruction,
+                    // There is no character for inserting an exit command,
                     // it's automatically inserted of the main function.
                     // In the future, the exit code could be the top of the stack, or 0 if stack is empty.
                     return;

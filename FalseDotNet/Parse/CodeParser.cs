@@ -1,6 +1,6 @@
 ﻿using System.Text;
 using System.Text.RegularExpressions;
-using FalseDotNet.Instructions;
+using FalseDotNet.Commands;
 using FalseDotNet.Utility;
 
 namespace FalseDotNet.Parse;
@@ -17,7 +17,7 @@ public class CodeParser : ICodeParser
         _stringIdGenerator = stringIdGenerator;
     }
 
-    private Instruction? ParseOperation(LinkedList<char> characters)
+    private Command? ParseOperation(LinkedList<char> characters)
     {
         if (characters.Count == 0) return null;
         var character = characters.PopFront();
@@ -31,7 +31,7 @@ public class CodeParser : ICodeParser
                 value = value * 10 + (c - '0');
             }
 
-            return new Instruction(Operation.IntLiteral, value);
+            return new Command(Operation.IntLiteral, value);
         }
 
         switch (character)
@@ -46,7 +46,7 @@ public class CodeParser : ICodeParser
 
             case '\'':
                 if (characters.Count == 0) throw new CodeParserException("Missing character");
-                return new Instruction(Operation.IntLiteral, characters.PopFront());
+                return new Command(Operation.IntLiteral, characters.PopFront());
 
             case '$':
                 return Operation.Dup;
@@ -94,7 +94,7 @@ public class CodeParser : ICodeParser
                 return Operation.Eq;
 
             case '[':
-                return new Instruction(Operation.Lambda, _lambdaIdGenerator.NewId);
+                return new Command(Operation.Lambda, _lambdaIdGenerator.NewId);
 
             case ']':
                 return Operation.Ret;
@@ -109,7 +109,7 @@ public class CodeParser : ICodeParser
                 return Operation.WhileInit;
 
             case >= 'a' and <= 'z':
-                return new Instruction(Operation.Ref, character - 'a');
+                return new Command(Operation.Ref, character - 'a');
 
             case ':':
                 return Operation.Store;
@@ -128,7 +128,7 @@ public class CodeParser : ICodeParser
 
                 var id = _stringIdGenerator.NewId;
                 _strings[id] = str.ToString();
-                return new Instruction(Operation.PrintString, id);
+                return new Command(Operation.PrintString, id);
             
             case '.':
                 return Operation.OutputDecimal;
@@ -149,8 +149,8 @@ public class CodeParser : ICodeParser
         var characters = new LinkedList<char>(code);
 
         var lambdaIds = new Stack<long>();
-        var lambdas = new Dictionary<long, LinkedList<Instruction>>();
-        var instructions = new LinkedList<Instruction>();
+        var lambdas = new Dictionary<long, LinkedList<Command>>();
+        var instructions = new LinkedList<Command>();
         var entryId = _lambdaIdGenerator.NewId;
         lambdaIds.Push(entryId);
         lambdas[entryId] = instructions;
@@ -169,7 +169,7 @@ public class CodeParser : ICodeParser
             else if (instruction.Op is Operation.Lambda)
             {
                 lambdaIds.Push(instruction.Argument);
-                lambdas[instruction.Argument] = instructions = new LinkedList<Instruction>();
+                lambdas[instruction.Argument] = instructions = new LinkedList<Command>();
             }
             else if (instruction.Op is Operation.Ret)
             {
@@ -189,7 +189,7 @@ public class CodeParser : ICodeParser
             entryId,
             lambdas.ToDictionary(
                 e => e.Key,
-                e => (IReadOnlyList<Instruction>)e.Value.ToList()
+                e => (IReadOnlyList<Command>)e.Value.ToList()
             ),
             _strings
         );
