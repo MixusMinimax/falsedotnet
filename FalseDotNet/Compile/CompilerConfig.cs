@@ -1,4 +1,6 @@
-﻿namespace FalseDotNet.Compile;
+﻿using FalseDotNet.Compile.Optimization;
+
+namespace FalseDotNet.Compile;
 
 public class CompilerConfig
 {
@@ -6,7 +8,7 @@ public class CompilerConfig
     /// Names of the entrypoint labels. "main" is the standard gcc entrypoint.
     /// </summary>
     public List<string> StartLabels { get; set; } = new() { "_start" };
-    
+
     /// <summary>
     /// If true, insert the Operations as comments into the assembly code.
     /// </summary>
@@ -26,4 +28,6 @@ public class CompilerConfig
     /// The size of the buffer used for stdout buffering.
     /// </summary>
     public long StdoutBufferSize { get; set; } = 128;
+
+    public OptimizerConfig OptimizerConfig { get; set; } = new();
 }

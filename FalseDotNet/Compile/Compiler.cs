@@ -1,4 +1,5 @@
 ﻿using FalseDotNet.Commands;
+using FalseDotNet.Compile.Optimization;
 using FalseDotNet.Parse;
 using FalseDotNet.Utility;
 
@@ -27,18 +28,20 @@ public class Compiler : ICompiler
     // @formatter:int_align_assignments restore
 
     private readonly ILogger _logger;
-    private readonly CompilerConfig _config;
     private readonly IIdGenerator _idGenerator;
+    private readonly IOptimizer _optimizer;
+    private CompilerConfig _config = null!;
 
-    public Compiler(ILogger logger, CompilerConfig config, IIdGenerator idGenerator)
+    public Compiler(ILogger logger, IIdGenerator idGenerator, IOptimizer optimizer)
     {
         _logger = logger;
-        _config = config;
         _idGenerator = idGenerator;
+        _optimizer = optimizer;
     }
 
-    public void Compile(Program program, TextWriter output)
+    public void Compile(Program program, TextWriter output, CompilerConfig config)
     {
+        _config = config;
         WriteHeader(output);
         output.WriteLine('\n');
         WriteConstants(output);
@@ -50,6 +53,8 @@ public class Compiler : ICompiler
         WriteData(output);
         output.WriteLine('\n');
         WriteRoData(program, output);
+
+        _optimizer.Optimize(new Assembly(), config.OptimizerConfig);
     }
 
     private string GetLabel(Program program, long id) =>
@@ -247,7 +252,7 @@ public class Compiler : ICompiler
                 O("    and rax, rdx");
                 O("    mov [rbx+(rcx-1)*8], rax");
                 break;
-            
+
             case Operation.Or:
                 Pop(output, "rax");
                 O(@"    mov rdx, [rbx+(rcx-1)*8]");
@@ -272,7 +277,7 @@ public class Compiler : ICompiler
                 O("    cmove rax, rdx");
                 O("    mov [rbx+(rcx-1)*8], rax");
                 break;
-            
+
             case Operation.Gt:
                 Pop(output, "rax");
                 O(@"    mov rdx, [rbx+(rcx-1)*8]");
@@ -365,7 +370,7 @@ public class Compiler : ICompiler
                 Pop(output, "rdi");
                 O("    call print_decimal");
                 break;
-            
+
             case Operation.Flush:
                 O("    call flush_stdout");
                 break;
@@ -373,7 +378,7 @@ public class Compiler : ICompiler
             case Operation.Exit:
                 Exit(output, 0); // maybe exit with top of FALSE stack?
                 break;
-            
+
             case Operation.WhileCondition or Operation.WhileBody:
                 throw new CompilerException("Unreachable");
         }
@@ -390,7 +395,7 @@ public class Compiler : ICompiler
         O("    push rdi");
         O("    call flush_stdout");
         O("    pop rdi");
-        
+
         // rax: number, rsi: isNegative, rbx: string base, rcx: string index
         // rdx: modulo
 
@@ -502,7 +507,7 @@ public class Compiler : ICompiler
     {
         void O(string s) => output.WriteLine(s);
         O(@"    push rdi");
-        O( @"    call flush_stdout");
+        O(@"    call flush_stdout");
         O(@"    pop rdi");
         O(@"    mov rax, SYS_WRITE");
         O($"    mov rdi, {fd}"); // stdout

@@ -1,6 +1,18 @@
-﻿namespace FalseDotNet.Cli.SubCommandExtensions;
+﻿using Microsoft.Extensions.DependencyInjection;
 
-public interface ISubCommand<in TOptions>
+namespace FalseDotNet.Cli.SubCommandExtensions;
+
+public interface ISubCommand
 {
-    int Run(TOptions opts);
+    int Run(object opts);
+}
+
+public abstract class SubCommand<TOptions> : ISubCommand
+{
+    public int Run(object opts)
+    {
+        return Run((TOptions)opts);
+    }
+
+    public abstract int Run(TOptions opts);
 }

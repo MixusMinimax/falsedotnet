@@ -3,14 +3,14 @@ using System.Text.RegularExpressions;
 using FalseDotNet.Binary;
 using FalseDotNet.Cli.SubCommandExtensions;
 using FalseDotNet.Compile;
+using FalseDotNet.Compile.Optimization;
 using FalseDotNet.Parse;
 using FalseDotNet.Utility;
-using Microsoft.Extensions.DependencyInjection;
 using Pastel;
 
 namespace FalseDotNet.Cli.SubCommands;
 
-public class CompileCommand : ISubCommand<CompileOptions>
+public class CompileCommand : SubCommand<CompileOptions>
 {
     private readonly ILogger _logger;
     private readonly ICodeParser _codeParser;
@@ -25,55 +25,63 @@ public class CompileCommand : ISubCommand<CompileOptions>
         _executor = executor;
     }
 
-    public static IServiceCollection RegisterServices(IServiceCollection services)
+    private CompilerConfig MapOptionsToCompilerConfig(CompileOptions options)
     {
-        services.AddSingleton(_ => new CompilerConfig
+        return new CompilerConfig
         {
-            StartLabels = new List<string> { "_start", "main" }
-        });
-        return services;
+            OptimizerConfig =
+            {
+                OptimizationLevel = options.OptimizationLevel switch
+                {
+                    0 => OptimizerConfig.EOptimizationLevel.O0,
+                    1 => OptimizerConfig.EOptimizationLevel.O1,
+                    2 => OptimizerConfig.EOptimizationLevel.O2,
+                    _ => throw new ArgumentException("Optimization level must be one of O0, O1, O2!")
+                }
+            }
+        };
     }
 
-    public int Run(CompileOptions opts)
+    public override int Run(CompileOptions options)
     {
-        if (string.IsNullOrWhiteSpace(opts.OutputPath))
-            opts.OutputPath = Regex.Replace(opts.InputPath, @"^(?:[^/\\]*[/\\])*(.*?)(?:\.+[^.]*)?$", "$1.asm");
-        if (Path.GetFullPath(opts.InputPath) == Path.GetFullPath(opts.OutputPath))
+        if (string.IsNullOrWhiteSpace(options.OutputPath))
+            options.OutputPath = Regex.Replace(options.InputPath, @"^(?:[^/\\]*[/\\])*(.*?)(?:\.+[^.]*)?$", "$1.asm");
+        if (Path.GetFullPath(options.InputPath) == Path.GetFullPath(options.OutputPath))
             throw new ArgumentException("Input and Output path point to the same file!");
-        new FileInfo(opts.OutputPath).Directory?.Create();
+        new FileInfo(options.OutputPath).Directory?.Create();
 
-        var objectPath = Regex.Replace(opts.OutputPath, @"\.asm$", ".o");
-        var binaryPath = Regex.Replace(opts.OutputPath, @"\.asm$", "");
+        var objectPath = Regex.Replace(options.OutputPath, @"\.asm$", ".o");
+        var binaryPath = Regex.Replace(options.OutputPath, @"\.asm$", "");
 
         try
         {
-            using var sr = new StreamReader(opts.InputPath);
+            using var sr = new StreamReader(options.InputPath);
             var code = sr.ReadToEnd();
             var parsedCode = _codeParser.Parse(code);
-            using var output = new StreamWriter(opts.OutputPath);
+            using var output = new StreamWriter(options.OutputPath);
 
-            _logger.WriteLine($"Compiling [{opts.InputPath}] into [{opts.OutputPath}].".Pastel(Color.Aqua));
-            _compiler.Compile(parsedCode, output);
+            _logger.WriteLine($"Compiling [{options.InputPath}] into [{options.OutputPath}].".Pastel(Color.Aqua));
+            _compiler.Compile(parsedCode, output, MapOptionsToCompilerConfig(options));
         }
         catch (CompilerException exception)
         {
             _logger.WriteLine(exception.Message.Pastel(Color.IndianRed));
-            File.Delete(opts.OutputPath);
+            File.Delete(options.OutputPath);
         }
         catch (IOException e)
         {
-            _logger.WriteLine($"Exception while reading [{opts.InputPath}]:".Pastel(Color.IndianRed));
+            _logger.WriteLine($"Exception while reading [{options.InputPath}]:".Pastel(Color.IndianRed));
             _logger.WriteLine(e.Message.Pastel(Color.IndianRed));
             return 1;
         }
 
-        if (opts.Assemble)
+        if (options.Assemble)
         {
-            _logger.WriteLine($"Assembling [{opts.OutputPath}] into [{objectPath}].".Pastel(Color.Aqua));
-            _executor.Assemble(opts.OutputPath, objectPath);
+            _logger.WriteLine($"Assembling [{options.OutputPath}] into [{objectPath}].".Pastel(Color.Aqua));
+            _executor.Assemble(options.OutputPath, objectPath);
         }
 
-        if (opts.Link)
+        if (options.Link)
         {
             _logger.WriteLine($"Linking [{objectPath}] into [{binaryPath}].".Pastel(Color.Aqua));
             _executor.Link(objectPath, binaryPath);

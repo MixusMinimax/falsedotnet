@@ -27,41 +27,20 @@ public static class FindSubCommands
             from marker in markers
             from type in marker.Assembly.ExportedTypes
             where !type.IsInterface && !type.IsAbstract
-            where type
-                .GetInterfaces()
-                .Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ISubCommand<>))
+            where (type.BaseType?.IsGenericType ?? false) &&
+                  type.BaseType?.GetGenericTypeDefinition() == typeof(SubCommand<>)
             select (
                 SubCommand: type,
                 Options: type
-                    .GetInterfaces()
-                    .First(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ISubCommand<>))
+                    .BaseType
                     .GetGenericArguments()[0]
             )
         ).ToDictionary(e => e.Options);
 
         services.TryAdd(
             from command in subCommands.Values
-            select new ServiceDescriptor(command.SubCommand, command.SubCommand, ServiceLifetime.Transient)
+            select new ServiceDescriptor(command.SubCommand, command.SubCommand, ServiceLifetime.Singleton)
         );
-
-        foreach (var cmd in subCommands.Values)
-        {
-            var (subcommand, _) = cmd;
-            var registerServices = subcommand.GetMethods().FirstOrDefault(m =>
-                m.GetParameters().Length == 1 &&
-                m.GetParameters()[0].ParameterType.IsAssignableFrom(typeof(IServiceCollection)) &&
-                Regex.IsMatch(m.Name.ToLower(), @"register_?services"));
-            if (registerServices is null)
-                continue;
-            try
-            {
-                registerServices.Invoke(null, new object[] { services });
-            }
-            catch (TargetInvocationException exception)
-            {
-                throw exception.InnerException!;
-            }
-        }
 
         return services.AddSingleton(new SubCommandsDict(subCommands));
     }
@@ -77,19 +56,9 @@ public static class FindSubCommands
 
         var optionsType = parsed.Value.GetType();
         var commandType = subCommands[optionsType].SubCommand;
-        var command = services.GetRequiredService(commandType);
-        var func = commandType.GetMethods().First(m =>
-            m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == optionsType &&
-            m.Name == typeof(ISubCommand<>).GetMethods()[0].Name);
-        try
-        {
-            return (int)(func.Invoke(command, new[] { parsed.Value }) ?? 1);
-        }
-        catch (TargetInvocationException exception)
-        {
-            var e = exception.InnerException!;
-            services.GetRequiredService<ILogger>().WriteLine(e.ToString().Pastel(Color.IndianRed));
-            return 1;
-        }
+        if (services.GetRequiredService(commandType) is ISubCommand command) return command.Run(parsed.Value);
+        services.GetRequiredService<ILogger>()
+            .WriteLine($"Command [{commandType.Name}] not found!".Pastel(Color.IndianRed));
+        return 1;
     }
 }

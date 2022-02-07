@@ -3,6 +3,7 @@ using FalseDotNet.Binary;
 using FalseDotNet.Cli;
 using FalseDotNet.Cli.SubCommandExtensions;
 using FalseDotNet.Compile;
+using FalseDotNet.Compile.Optimization;
 using FalseDotNet.Interpret;
 using FalseDotNet.Parse;
 using FalseDotNet.Utility;
@@ -17,5 +18,6 @@ return new ServiceCollection()
     .AddTransient<ICodeParser, CodeParser>()
     .AddTransient<IInterpreter, Interpreter>()
     .AddTransient<ICompiler, Compiler>()
+    .AddTransient<IOptimizer, Optimizer>()
     .BuildServiceProvider()
     .ParseAndExecute(Parser.Default, args, _ => 1);

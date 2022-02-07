@@ -4,5 +4,5 @@ namespace FalseDotNet.Compile;
 
 public interface ICompiler
 {
-    public void Compile(Program program, TextWriter output);
+    public void Compile(Program program, TextWriter output, CompilerConfig config);
 }

@@ -7,7 +7,7 @@ using Pastel;
 
 namespace FalseDotNet.Cli.SubCommands;
 
-public class InterpretCommand : ISubCommand<InterpretOptions>
+public class InterpretCommand : SubCommand<InterpretOptions>
 {
     private readonly ILogger _logger;
     private readonly ICodeParser _codeParser;
@@ -20,7 +20,7 @@ public class InterpretCommand : ISubCommand<InterpretOptions>
         _interpreter = interpreter;
     }
 
-    public int Run(InterpretOptions opts)
+    public override int Run(InterpretOptions opts)
     {
         _logger.WriteLine($"Interpreting [{opts.InputPath}].".Pastel(Color.Aqua));
         try
