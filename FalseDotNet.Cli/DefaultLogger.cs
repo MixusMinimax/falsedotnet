@@ -2,7 +2,7 @@
 
 namespace FalseDotNet.Cli;
 
-public class DefaultLogger : ILogger
+public class DefaultLogger : IFlushableLogger
 {
     public ILogger Write<T>(T message)
     {
@@ -61,5 +61,10 @@ public class DefaultLogger : ILogger
         Write(message);
         Console.WriteLine();
         return this;
+    }
+
+    public void Flush()
+    {
+        Console.Out.Flush();
     }
 }

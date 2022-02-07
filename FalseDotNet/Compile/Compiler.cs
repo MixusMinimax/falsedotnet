@@ -371,6 +371,10 @@ public class Compiler : ICompiler
                 Pop(output, "rdi");
                 O("    call print_decimal");
                 break;
+            
+            case Operation.Flush:
+                // TODO
+                break;
 
             case Operation.Exit:
                 Exit(output, 0); // maybe exit with top of FALSE stack?

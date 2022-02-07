@@ -248,6 +248,10 @@ public class Interpreter : IInterpreter
                     _logger.Write(a);
                     break;
 
+                case Operation.Flush:
+                    (_logger as IFlushableLogger)?.Flush();
+                    break;
+                
                 default:
                     throw new InterpreterException("Unreachable");
             }

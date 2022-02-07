@@ -50,6 +50,7 @@ public enum Operation
     PrintString,
     OutputChar,
     OutputDecimal,
+    Flush,
 }
 
 public static class OperationExtensions

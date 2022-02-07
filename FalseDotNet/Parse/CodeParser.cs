@@ -135,6 +135,9 @@ public class CodeParser : ICodeParser
 
             case ',':
                 return Operation.OutputChar;
+            
+            case 'ß':
+                return Operation.Flush;
         }
         
         return null;
