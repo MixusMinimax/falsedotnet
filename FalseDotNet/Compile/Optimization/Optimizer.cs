@@ -13,7 +13,7 @@ public class Optimizer : IOptimizer
         _logger = logger;
     }
 
-    public void Optimize(Assembly assembly, OptimizerConfig config)
+    public void Optimize(Asm asm, OptimizerConfig config)
     {
         // _logger.WriteLine(config.OptimizationLevel.ToString().Pastel(Color.Gold));
     }

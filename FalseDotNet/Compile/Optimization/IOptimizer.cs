@@ -2,5 +2,5 @@
 
 public interface IOptimizer
 {
-    public void Optimize(Assembly assembly, OptimizerConfig config);
+    public void Optimize(Asm asm, OptimizerConfig config);
 }

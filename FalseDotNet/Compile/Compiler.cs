@@ -1,4 +1,5 @@
 ﻿using FalseDotNet.Commands;
+using FalseDotNet.Compile.Instructions;
 using FalseDotNet.Compile.Optimization;
 using FalseDotNet.Parse;
 using FalseDotNet.Utility;
@@ -8,6 +9,16 @@ namespace FalseDotNet.Compile;
 public class Compiler : ICompiler
 {
     // @formatter:int_align_assignments true
+    private static readonly Register Rax = new Register(ERegister.ax, ERegisterSize.r);
+    private static readonly Register Rbx = new Register(ERegister.bx, ERegisterSize.r);
+    private static readonly Register Rcx = new Register(ERegister.cx, ERegisterSize.r);
+    private static readonly Register Rdx = new Register(ERegister.dx, ERegisterSize.r);
+    private static readonly Register Rdi = new Register(ERegister.di, ERegisterSize.r);
+    private static readonly Register Rsi = new Register(ERegister.si, ERegisterSize.r);
+    private static readonly Register R8 = new Register(ERegister.r8, ERegisterSize.r);
+    private static readonly Register R9 = new Register(ERegister.r9, ERegisterSize.r);
+    private static readonly Register R10 = new Register(ERegister.r10, ERegisterSize.r);
+
     private static readonly Dictionary<string, string> Macros = new()
     {
         ["SYS_WRITE"]     = "1",
@@ -31,6 +42,7 @@ public class Compiler : ICompiler
     private readonly IIdGenerator _idGenerator;
     private readonly IOptimizer _optimizer;
     private CompilerConfig _config = null!;
+    private Asm _asm = null!;
 
     public Compiler(ILogger logger, IIdGenerator idGenerator, IOptimizer optimizer)
     {
@@ -42,19 +54,23 @@ public class Compiler : ICompiler
     public void Compile(Program program, TextWriter output, CompilerConfig config)
     {
         _config = config;
-        WriteHeader(output);
-        output.WriteLine('\n');
-        WriteConstants(output);
-        output.WriteLine('\n');
-        WriteText(program, output);
-        output.WriteLine('\n');
-        WriteBss(output);
-        output.WriteLine('\n');
-        WriteData(output);
-        output.WriteLine('\n');
-        WriteRoData(program, output);
+        _asm = new Asm();
 
-        _optimizer.Optimize(new Assembly(), config.OptimizerConfig);
+        WriteHeader();
+        _asm.Str();
+        WriteConstants();
+        _asm.Str();
+        WriteText(program);
+        _asm.Str();
+        WriteBss();
+        _asm.Str();
+        WriteData();
+        _asm.Str();
+        WriteRoData(program);
+
+        _optimizer.Optimize(_asm, config.OptimizerConfig);
+
+        _asm.WriteOut(output);
     }
 
     private string GetLabel(Program program, long id) =>
@@ -69,314 +85,311 @@ public class Compiler : ICompiler
     private string GenerateNewLabel() =>
         $"_local_{_idGenerator.NewId:D3}";
 
-    private static void WriteHeader(TextWriter output)
+    private void WriteHeader()
     {
-        output.WriteLine("; Generated using the FALSE.NET compiler.");
-        output.WriteLine("; =======================================");
+        _asm.Com("Generated using the FALSE.NET compiler.")
+            .Com("=======================================");
     }
 
-    private static void WriteConstants(TextWriter output)
+    private void WriteConstants()
     {
-        output.WriteLine("; Constants:");
+        _asm.Com("Constants:");
         foreach (var (key, value) in Macros)
         {
-            output.WriteLine($"%define {key} {value}");
+            _asm.Str($"%define {key} {value}");
         }
     }
 
-    private void WriteText(Program program, TextWriter output)
+    private void WriteText(Program program)
     {
-        output.WriteLine("; Code:");
-        output.WriteLine("    section .text");
+        _asm.Com("Code:")
+            .Sec(ESection.Text);
         foreach (var label in _config.StartLabels)
-            output.WriteLine($"    global {label}");
+            _asm.Str($"    global {label}");
 
         foreach (var id in program.Functions.Keys)
         {
-            CompileLambda(program, output, id);
+            CompileLambda(program, id);
         }
 
-        WriteDecimalConverter(output);
-        WritePrintCharacter(output);
-        WriteFlushStdout(output);
+        WriteDecimalConverter();
+        WritePrintCharacter();
+        WriteFlushStdout();
     }
 
-    private void WriteSetup(TextWriter output)
+    private void WriteSetup()
     {
-        void O(string s) => output.WriteLine(s);
-        O(@";===[SETUP START]===");
-        O(@"    ; Allocate FALSE stack:");
-        O(@"    mov rax, SYS_MMAP");
-        O(@"    mov rdi, 0");
-        O($"    mov rsi, 0x{_config.StackSize:x8}");
-        O(@"    mov rdx, PROT_READ | PROT_WRITE");
-        O(@"    mov r10, MAP_PRIVATE | MAP_ANONYMOUS");
-        O(@"    mov r8, -1");
-        O(@"    mov r9, 0");
-        O(@"    syscall");
-        O(@"    ; Check for mmap success");
-        O(@"    cmp rax, -1");
-        O(@"    jne skip_mmap_error");
-        O(@"    ; Print the fact that mmap failed");
-        PrintString(output, "mmap_error", "mmap_error_len", 2);
-        Exit(output, 1);
-        O(@"skip_mmap_error:");
-        O(@"    mov [rel stack], rax");
-        O(@";===[SETUP  END]===");
-        O("");
+        _asm.Com("===[SETUP START]===")
+            .Com("Allocate FALSE stack:", true)
+            .Mov(Rax, "SYS_MMAP")
+            .Zro(Rdi)
+            .Mov(Rsi, _config.StackSize)
+            .Mov(Rdx, "PROT_READ | PROT_WRITE")
+            .Mov(R10, "MAP_PRIVATE | MAP_ANONYMOUS")
+            .Mov(R8, -1)
+            .Zro(R9)
+            .Syscall()
+            .Com("Check for mmap success", true)
+            .Cmp(Rax, -1)
+            .Jne("skip_mmap_error")
+            .Com(@"Print the fact that mmap failed", true);
+        PrintString("mmap_error", "mmap_error_len", 2);
+        Exit(1);
+        _asm.Lbl(@"skip_mmap_error")
+            .Mov(new LabelAddress("stack"), Rax)
+            .Com(@"===[SETUP  END]===")
+            .Str();
     }
 
-    private void CompileLambda(Program program, TextWriter output, long lambdaId)
+    private void CompileLambda(Program program, long lambdaId)
     {
-        output.WriteLine();
+        _asm.Str();
         if (lambdaId == program.EntryId)
         {
             foreach (var label in _config.StartLabels)
-                output.WriteLine($"{label}:");
-            WriteSetup(output);
+                _asm.Lbl(label);
+            WriteSetup();
         }
         else
         {
-            output.WriteLine($"{GetLabel(program, lambdaId)}:");
+            _asm.Lbl(GetLabel(program, lambdaId));
         }
 
         var lambda = program.Functions[lambdaId];
         foreach (var command in lambda)
         {
-            CompileCommand(program, command, output);
+            CompileCommand(program, command);
         }
     }
 
-    private void CompileCommand(Program program, Command command, TextWriter output)
+    private void CompileCommand(Program program, Command command)
     {
-        void O(string s) => output.WriteLine(s);
         var (operation, argument) = command;
         if (operation is Operation.WhileCondition or Operation.WhileBody)
             return;
         if (_config.WriteCommandComments)
-            O($"    ; -- {command} --");
+            _asm.Com($"-- {command} --", true);
 
         switch (operation)
         {
             // Literals
 
             case Operation.IntLiteral:
-                O($"    mov rax, 0x{argument:x8}");
-                Push(output, "rax");
+                _asm.Mov(Rax, argument);
+                Push("rax");
                 break;
 
             // Stack
 
             case Operation.Dup:
-                Peek(output, "rax");
-                Push(output, "rax");
+                Peek("rax");
+                Push("rax");
                 break;
 
             case Operation.Drop:
-                Drop(output);
+                Drop();
                 break;
 
             case Operation.Swap:
-                O(@"    mov rbx, [rel stack]");
-                O(@"    mov rcx, [rel stack_ptr]");
-                O(@"    mov rax, [rbx+(rcx-1)*8]");
-                O(@"    mov rdx, [rbx+(rcx-2)*8]");
-                O(@"    mov [rbx+(rcx-1)*8], rdx");
-                O(@"    mov [rbx+(rcx-2)*8], rax");
+                _asm.Mov(Rbx, new LabelAddress("stack"))
+                    .Mov(Rcx, new LabelAddress("stack_ptr"))
+                    .Mov(Rax, new Address(Rbx, Rcx, -1, 8))
+                    .Mov(Rdx, "[rbx+(rcx-2)*8]")
+                    .Mov(new Address(Rbx, Rcx, -1, 8), Rdx)
+                    .Mov(new Address(Rbx, Rcx, -2, 8), Rax);
                 break;
 
             case Operation.Rot:
-                O(@"    mov rbx, [rel stack]");
-                O(@"    mov rcx, [rel stack_ptr]");
-                O(@"    mov rax, [rbx+(rcx-1)*8]");
-                O(@"    mov rdx, [rbx+(rcx-2)*8]");
-                O(@"    mov rsi, [rbx+(rcx-3)*8]");
-                O(@"    mov [rbx+(rcx-1)*8], rsi");
-                O(@"    mov [rbx+(rcx-2)*8], rax");
-                O(@"    mov [rbx+(rcx-3)*8], rdx");
+                _asm.Mov(Rbx, new LabelAddress("stack"))
+                    .Mov(Rcx, new LabelAddress("stack_ptr"))
+                    .Mov(Rax, new Address(Rbx, Rcx, -1, 8))
+                    .Mov(Rdx, new Address(Rbx, Rcx, -2, 8))
+                    .Mov(Rsi, new Address(Rbx, Rcx, -3, 8))
+                    .Mov(new Address(Rbx, Rcx, -1, 8), Rsi)
+                    .Mov(new Address(Rbx, Rcx, -2, 8), Rax)
+                    .Mov(new Address(Rbx, Rcx, -3, 8), Rdx);
                 break;
 
             case Operation.Pick:
-                Peek(output, "rax"); // Offset
-                O("    mov rsi, rcx");
-                O("    sub rsi, rax");
-                O("    mov rax, [rbx+(rsi-2)*8]");
-                O("    mov [rbx+(rcx-1)*8], rax");
+                Peek("rax"); // Offset
+                _asm.Mov(Rsi, Rcx)
+                    .Sub(Rsi, Rax)
+                    .Mov(Rax, new Address(Rbx, Rsi, -2, 8))
+                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
-
 
             // Arithmetic
 
             case Operation.Add:
-                Pop(output, "rax");
-                O(@"    mov rdx, [rbx+(rcx-1)*8]");
-                O("    add rax, rdx");
-                O("    mov [rbx+(rcx-1)*8], rax");
+                Pop("rax");
+                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
+                    .Add(Rax, Rdx)
+                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             case Operation.Sub:
-                Pop(output, "rax");
-                O(@"    mov rdx, [rbx+(rcx-1)*8]");
-                O("    sub rdx, rax");
-                O("    mov [rbx+(rcx-1)*8], rdx");
+                Pop("rax");
+                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
+                    .Sub(Rdx, Rax)
+                    .Mov(new Address(Rbx, Rcx, -1, 8), Rdx);
                 break;
 
             case Operation.Mul:
-                Pop(output, "rax");
-                O(@"    mov rdx, [rbx+(rcx-1)*8]");
-                O("    imul rax, rdx");
-                O("    mov [rbx+(rcx-1)*8], rax");
+                Pop("rax");
+                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
+                    .Mul(Rax, Rdx)
+                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             case Operation.Div:
-                Pop(output, "rdi");
-                O(@"    mov rax, [rbx+(rcx-1)*8]");
-                O("    xor rdx, rdx");
-                O("    mov rsi, rdx");
-                O("    not rsi");
-                O("    cmp rax, 0");
-                O("    cmovl rdx, rsi");
-                O("    idiv rdi");
-                O("    mov [rbx+(rcx-1)*8], rax");
+                Pop("rdi");
+                _asm.Mov(Rax, new Address(Rbx, Rcx, -1, 8))
+                    .Zro(Rdx)
+                    .Mov(Rsi, Rdx)
+                    .Not(Rsi)
+                    .Cmp(Rax, 0)
+                    .Ins(Mnemonic.CMovL, Rdx, Rsi)
+                    .Div(Rdi)
+                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             case Operation.Neg:
-                Peek(output, "rax");
-                O("    neg rax");
-                O("    mov [rbx+(rcx-1)*8], rax");
+                Peek("rax");
+                _asm.Neg(Rax)
+                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             case Operation.And:
-                Pop(output, "rax");
-                O(@"    mov rdx, [rbx+(rcx-1)*8]");
-                O("    and rax, rdx");
-                O("    mov [rbx+(rcx-1)*8], rax");
+                Pop("rax");
+                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
+                    .And(Rax, Rdx)
+                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             case Operation.Or:
-                Pop(output, "rax");
-                O(@"    mov rdx, [rbx+(rcx-1)*8]");
-                O("    or rax, rdx");
-                O("    mov [rbx+(rcx-1)*8], rax");
+                Pop("rax");
+                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
+                    .Or(Rax, Rdx)
+                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             case Operation.Not:
-                Peek(output, "rax");
-                O("    not rax");
-                O("    mov [rbx+(rcx-1)*8], rax");
+                Peek("rax");
+                _asm.Not(Rax)
+                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             // Comparison
 
             case Operation.Eq:
-                Pop(output, "rax");
-                O(@"    mov rdx, [rbx+(rcx-1)*8]");
-                O("    cmp rax, rdx");
-                O("    mov rax, 0");
-                O("    mov rdx, 0xffffffffffffffff");
-                O("    cmove rax, rdx");
-                O("    mov [rbx+(rcx-1)*8], rax");
+                Pop("rax");
+                _asm.Str(@"    mov rdx, [rbx+(rcx-1)*8]")
+                    .Str("    cmp rax, rdx")
+                    .Str("    mov rax, 0")
+                    .Str("    mov rdx, 0xffffffffffffffff")
+                    .Str("    cmove rax, rdx")
+                    .Str("    mov [rbx+(rcx-1)*8], rax");
                 break;
 
             case Operation.Gt:
-                Pop(output, "rax");
-                O(@"    mov rdx, [rbx+(rcx-1)*8]");
-                O("    cmp rax, rdx");
-                O("    mov rax, 0");
-                O("    mov rdx, 0xffffffffffffffff");
-                O("    cmovl rax, rdx");
-                O("    mov [rbx+(rcx-1)*8], rax");
+                Pop("rax");
+                _asm.Str(@"    mov rdx, [rbx+(rcx-1)*8]")
+                    .Str("    cmp rax, rdx")
+                    .Str("    mov rax, 0")
+                    .Str("    mov rdx, 0xffffffffffffffff")
+                    .Str("    cmovl rax, rdx")
+                    .Str("    mov [rbx+(rcx-1)*8], rax");
                 break;
 
             // Control Flow and Lambdas
 
             case Operation.Lambda:
-                O($"    lea rax, [rel {GetLabel(program, argument)}]");
-                Push(output, "rax");
+                _asm.Str($"    lea rax, [rel {GetLabel(program, argument)}]");
+                Push("rax");
                 break;
 
             case Operation.Ret:
-                O("    ret");
+                _asm.Str("    ret");
                 break;
 
             case Operation.Execute:
-                Pop(output, "rax");
-                O($"    call rax");
+                Pop("rax");
+                _asm.Str($"    call rax");
                 break;
 
             case Operation.ConditionalExecute:
                 var label = GenerateNewLabel();
-                Pop(output, "rax"); // body
-                Pop(output, "rdx"); // condition
-                O(@"    cmp rdx, 0");
-                O($"    jz {label}");
-                O(@"    call rax");
-                O($"{label}:");
+                Pop("rax"); // body
+                Pop("rdx"); // condition
+                _asm.Str(@"    cmp rdx, 0")
+                    .Str($"    jz {label}")
+                    .Str(@"    call rax")
+                    .Str($"{label}:");
                 break;
 
             case Operation.WhileInit:
-                Pop(output, "rax"); // body
-                O("    push rax");
-                Pop(output, "rax"); // condition
-                O("    push rax");
+                Pop("rax"); // body
+                _asm.Str("    push rax");
+                Pop("rax"); // condition
+                _asm.Str("    push rax");
                 var loop = GenerateNewLabel();
                 var condition = GenerateNewLabel();
-                O($"    jmp {condition}");
-                O($"{loop}:");
-                O(@"    mov rax, [rsp+8]");
-                O(@"    call rax");
-                O($"{condition}:");
-                O(@"    mov rax, [rsp]");
-                O(@"    call rax");
-                Pop(output, "rax");
-                O(@"    cmp rax, 0");
-                O($"    jnz {loop}");
-                O(@"    add rsp, 16");
+                _asm.Str($"    jmp {condition}")
+                    .Str($"{loop}:")
+                    .Str(@"    mov rax, [rsp+8]")
+                    .Str(@"    call rax")
+                    .Str($"{condition}:")
+                    .Str(@"    mov rax, [rsp]")
+                    .Str(@"    call rax");
+                Pop("rax");
+                _asm.Str(@"    cmp rax, 0")
+                    .Str($"    jnz {loop}")
+                    .Str(@"    add rsp, 16");
                 break;
 
             // Names
 
             case Operation.Ref:
-                O($"    mov rax, {argument}");
-                Push(output, "rax");
+                _asm.Str($"    mov rax, {argument}");
+                Push("rax");
                 break;
 
             case Operation.Store:
-                Pop(output, "rax");
-                Pop(output, "rdx");
-                O("    lea rbx, [rel references]");
-                O("    mov [rbx+rax*8], rdx");
+                Pop("rax");
+                Pop("rdx");
+                _asm.Str("    lea rbx, [rel references]")
+                    .Str("    mov [rbx+rax*8], rdx");
                 break;
 
             case Operation.Load:
-                Peek(output, "rax");
-                O("    lea rbx, [rel references]");
-                O("    mov rdx, [rbx+rax*8]");
-                Replace(output, "rdx");
+                Peek("rax");
+                _asm.Str("    lea rbx, [rel references]")
+                    .Str("    mov rdx, [rbx+rax*8]");
+                Replace("rdx");
                 break;
 
             // I/O
 
             case Operation.PrintString:
-                PrintString(output, argument);
+                PrintString(argument);
                 break;
 
             case Operation.OutputChar:
-                Pop(output, "rdi");
-                O("    call print_character");
+                Pop("rdi");
+                _asm.Str("    call print_character");
                 break;
 
             case Operation.OutputDecimal:
-                Pop(output, "rdi");
-                O("    call print_decimal");
+                Pop("rdi");
+                _asm.Str("    call print_decimal");
                 break;
 
             case Operation.Flush:
-                O("    call flush_stdout");
+                _asm.Str("    call flush_stdout");
                 break;
 
             case Operation.Exit:
-                Exit(output, 0); // maybe exit with top of FALSE stack?
+                Exit(0); // maybe exit with top of FALSE stack?
                 break;
 
             case Operation.WhileCondition or Operation.WhileBody:
@@ -384,238 +397,225 @@ public class Compiler : ICompiler
         }
     }
 
-    private void WriteDecimalConverter(TextWriter output)
+    private void WriteDecimalConverter()
     {
-        void O(string s) => output.WriteLine(s);
-        O("");
-        O("; Converts rdi to decimal and writes to stdout.");
-        O("print_decimal:");
+        _asm.Str("")
+            .Str("; Converts rdi to decimal and writes to stdout.")
+            .Str("print_decimal:")
 
-        // For now, flush stdout. In the future, this function will also write into the buffer.
-        O("    push rdi");
-        O("    call flush_stdout");
-        O("    pop rdi");
+            // For now, flush stdout. In the future, this function will also write into the buffer.
+            .Str("    push rdi")
+            .Str("    call flush_stdout")
+            .Str("    pop rdi")
 
-        // rax: number, rsi: isNegative, rbx: string base, rcx: string index
-        // rdx: modulo
+            // rax: number, rsi: isNegative, rbx: string base, rcx: string index
+            // rdx: modulo
 
-        // 1. take the absolute and remember if number was negative.
-        O("    mov rax, rdi");
-        O("    neg rdi");
-        O("    mov r11, 0");
-        O("    mov rdx, -1");
-        O("    cmp rax, 0");
-        O("    cmovl r11, rdx");
-        O("    cmovl rax, rdi");
+            // 1. take the absolute and remember if number was negative.
+            .Str("    mov rax, rdi")
+            .Str("    neg rdi")
+            .Str("    mov r11, 0")
+            .Str("    mov rdx, -1")
+            .Str("    cmp rax, 0")
+            .Str("    cmovl r11, rdx")
+            .Str("    cmovl rax, rdi")
 
-        // 2. Convert to decimal and store in string_buffer. (right to left)
-        //    Count decimal places.
-        O("    mov rdi, 10");
-        O("    lea r8, [rel string_buffer]");
-        O($"    mov rcx, 0x{_config.StringBufferSize:x8}"); // Start at the end
-        O("print_decimal_loop:");
-        O("    dec rcx");
-        O("    xor rdx, rdx");
-        O("    div rdi"); // digit in rdx
-        O("    add dl, '0'");
-        O("    mov [r8,rcx], dl");
-        O("    cmp rax, 0");
-        O("    jne print_decimal_loop");
+            // 2. Convert to decimal and store in string_buffer. (right to left)
+            //    Count decimal places.
+            .Str("    mov rdi, 10")
+            .Str("    lea r8, [rel string_buffer]")
+            .Str($"    mov rcx, 0x{_config.StringBufferSize:x8}") // Start at the end
+            .Str("print_decimal_loop:")
+            .Str("    dec rcx")
+            .Str("    xor rdx, rdx")
+            .Str("    div rdi") // digit in rdi
+            .Str("    add dl, '0'")
+            .Str("    mov [r8,rcx], dl")
+            .Str("    cmp rax, 0")
+            .Str("    jne print_decimal_loop")
 
-        // 3. Write '-' in front if number was negative.
-        //    also, increment length counter
-        O("    cmp r11, 0");
-        O("    je print_decimal_skip");
-        O("    dec rcx");
-        O("    mov dl, '-'");
-        O("    mov [r8,rcx], dl");
-        O("print_decimal_skip:");
+            // 3. Write '-' in front if number was negative.
+            //    also, increment length counter
+            .Str("    cmp r11, 0")
+            .Str("    je print_decimal_skip")
+            .Str("    dec rcx")
+            .Str("    mov dl, '-'")
+            .Str("    mov [r8,rcx], dl")
+            .Str("print_decimal_skip:")
 
-        // 4. Pass string_buffer+32-length as pointer, length to write syscall.
-        O("    add r8, rcx");
-        O($"    mov rdx, 0x{_config.StringBufferSize:x8}");
-        O("    sub rdx, rcx");
-        O("    mov rax, SYS_WRITE");
-        O("    mov rdi, 1");
-        O("    mov rsi, r8");
-        O("    syscall");
-        O("    ret");
+            // 4. Pass string_buffer+32-length as pointer, length to write syscall.
+            .Str("    add r8, rcx")
+            .Str($"    mov rdx, 0x{_config.StringBufferSize:x8}")
+            .Str("    sub rdx, rcx")
+            .Str("    mov rax, SYS_WRITE")
+            .Str("    mov rdi, 1")
+            .Str("    mov rsi, r8")
+            .Str("    syscall")
+            .Str("    ret");
     }
 
-    private void WritePrintCharacter(TextWriter output)
+    private void WritePrintCharacter()
     {
-        void O(string s) => output.WriteLine(s);
-        O("");
-        O("; Prints character located in dil.");
-        O("print_character:");
-        O("    lea rsi, [rel stdout_buffer]");
-        O("    xor rdx, rdx");
-        O("    mov dx, [rel stdout_len]");
-        O("    mov [rsi+rdx], rdi");
-        O("    inc dx");
-        O("    mov r8b, 0");
-        O("    mov r9b, 0");
-        O("    mov r10b, 0xff");
-        O($"    cmp dx, {_config.StdoutBufferSize}");
-        O("    cmove r8, r10");
-        O("    cmp dil, 10"); // flush on newlines
-        O("    cmove r9, r10");
-        O("    or r8b, r9b");
-        O("    cmp r8b, 0");
-        O("    jz print_character_ret");
-        O("    mov rax, SYS_WRITE");
-        O("    mov rdi, 1");
-        // rsi is already pointing to the string
-        // rdx is already the length of the string
-        O("    syscall");
-        O("    mov dx, 0");
-        O("print_character_ret:");
-        O("    mov [rel stdout_len], dx");
-        O("    ret");
+        _asm.Str("")
+            .Str("; Prints character located in dil.")
+            .Str("print_character:")
+            .Str("    lea rsi, [rel stdout_buffer]")
+            .Str("    xor rdx, rdx")
+            .Str("    mov dx, [rel stdout_len]")
+            .Str("    mov [rsi+rdx], rdi")
+            .Str("    inc dx")
+            .Str("    mov r8b, 0")
+            .Str("    mov r9b, 0")
+            .Str("    mov r10b, 0xff")
+            .Str($"    cmp dx, {_config.StdoutBufferSize}")
+            .Str("    cmove r8, r10")
+            .Str("    cmp dil, 10") // flush on newlines
+            .Str("    cmove r9, r10")
+            .Str("    or r8b, r9b")
+            .Str("    cmp r8b, 0")
+            .Str("    jz print_character_ret")
+            .Str("    mov rax, SYS_WRITE")
+            .Str("    mov rdi, 1")
+            // rsi is already pointing to the string
+            // rdx is already the length of the string
+            .Str("    syscall")
+            .Str("    mov dx, 0")
+            .Str("print_character_ret:")
+            .Str("    mov [rel stdout_len], dx")
+            .Str("    ret");
     }
 
-    private void WriteFlushStdout(TextWriter output)
+    private void WriteFlushStdout()
     {
-        void O(string s) => output.WriteLine(s);
-        O("");
-        O("; Flushes stdout.");
-        O("flush_stdout:");
-        O("    lea rsi, [rel stdout_buffer]");
-        O("    xor rdx, rdx");
-        O("    mov dx, [rel stdout_len]");
-        O("    cmp dx, 0");
-        O("    jz flush_stdout_ret");
-        O("    mov rax, SYS_WRITE");
-        O("    mov rdi, 1");
-        O("    syscall");
-        O("    mov dx, 0");
-        O("    mov [rel stdout_len], dx");
-        O("flush_stdout_ret:");
-        O("    ret");
+        _asm.Str("")
+            .Str("; Flushes stdout.")
+            .Str("flush_stdout:")
+            .Str("    lea rsi, [rel stdout_buffer]")
+            .Str("    xor rdx, rdx")
+            .Str("    mov dx, [rel stdout_len]")
+            .Str("    cmp dx, 0")
+            .Str("    jz flush_stdout_ret")
+            .Str("    mov rax, SYS_WRITE")
+            .Str("    mov rdi, 1")
+            .Str("    syscall")
+            .Str("    mov dx, 0")
+            .Str("    mov [rel stdout_len], dx")
+            .Str("flush_stdout_ret:")
+            .Str("    ret");
     }
 
     /*****************************************\
      *            Common Patterns            *
      *****************************************/
 
-    private static void PrintString(TextWriter output, long id, int fd = 1)
+    private void PrintString(long id, int fd = 1)
     {
-        PrintString(output, GetStringLabel(id), GetStringLenLabel(id), fd);
+        PrintString(GetStringLabel(id), GetStringLenLabel(id), fd);
     }
 
-    private static void PrintString(TextWriter output, string strLabel, string lenLabel, int fd = 1)
+    private void PrintString(string strLabel, string lenLabel, int fd = 1)
     {
-        void O(string s) => output.WriteLine(s);
-        O(@"    push rdi");
-        O(@"    call flush_stdout");
-        O(@"    pop rdi");
-        O(@"    mov rax, SYS_WRITE");
-        O($"    mov rdi, {fd}"); // stdout
-        O($"    lea rsi, [rel {strLabel}]");
-        O($"    mov rdx, {lenLabel}");
-        O(@"    syscall");
+        _asm.Str(@"    push rdi")
+            .Str(@"    call flush_stdout")
+            .Str(@"    pop rdi")
+            .Str(@"    mov rax, SYS_WRITE")
+            .Str($"    mov rdi, {fd}") // stdo
+            .Str($"    lea rsi, [rel {strLabel}]")
+            .Str($"    mov rdx, {lenLabel}")
+            .Str(@"    syscall");
     }
 
-    private static void Exit(TextWriter output, int exitCode = 0)
+    private void Exit(int exitCode = 0)
     {
-        Exit(output, $"{exitCode}");
+        Exit($"{exitCode}");
     }
 
-    private static void Exit(TextWriter output, string exitCode)
+    private void Exit(string exitCode)
     {
-        void O(string s) => output.WriteLine(s);
-        O(@"    mov rax, SYS_EXIT");
-        O($"    mov rdi, {exitCode}");
-        O(@"    syscall");
+        _asm.Str(@"    mov rax, SYS_EXIT")
+            .Str($"    mov rdi, {exitCode}")
+            .Str(@"    syscall");
     }
 
-    private static void Push(TextWriter output, string register)
+    private void Push(string register)
     {
-        void O(string s) => output.WriteLine(s);
-        O(@"    mov rbx, [rel stack]");
-        O(@"    mov rcx, [rel stack_ptr]");
-        O($"    mov [rbx,rcx*8], {register}");
-        O(@"    inc rcx");
-        O(@"    mov [rel stack_ptr], rcx");
+        _asm.Str(@"    mov rbx, [rel stack]")
+            .Str(@"    mov rcx, [rel stack_ptr]")
+            .Str($"    mov [rbx,rcx*8], {register}")
+            .Str(@"    inc rcx")
+            .Str(@"    mov [rel stack_ptr], rcx");
     }
 
-    private static void Pop(TextWriter output, string register)
+    private void Pop(string register)
     {
-        void O(string s) => output.WriteLine(s);
-        O(@"    mov rbx, [rel stack]");
-        O(@"    mov rcx, [rel stack_ptr]");
-        O(@"    dec rcx");
-        O($"    mov {register}, [rbx,rcx*8]");
-        O(@"    mov [rel stack_ptr], rcx");
+        _asm.Str(@"    mov rbx, [rel stack]")
+            .Str(@"    mov rcx, [rel stack_ptr]")
+            .Str(@"    dec rcx")
+            .Str($"    mov {register}, [rbx,rcx*8]")
+            .Str(@"    mov [rel stack_ptr], rcx");
     }
 
-    private static void Drop(TextWriter output)
+    private void Drop()
     {
-        void O(string s) => output.WriteLine(s);
-        O(@"    mov rcx, [rel stack_ptr]");
-        O(@"    dec rcx");
-        O(@"    mov [rel stack_ptr], rcx");
+        _asm.Str(@"    mov rcx, [rel stack_ptr]")
+            .Str(@"    dec rcx")
+            .Str(@"    mov [rel stack_ptr], rcx");
     }
 
-    private static void Replace(TextWriter output, string register)
+    private void Replace(string register)
     {
-        void O(string s) => output.WriteLine(s);
-        O(@"    mov rbx, [rel stack]");
-        O(@"    mov rcx, [rel stack_ptr]");
-        O($"    mov [rbx+(rcx-1)*8], {register}");
+        _asm.Str(@"    mov rbx, [rel stack]")
+            .Str(@"    mov rcx, [rel stack_ptr]")
+            .Str($"    mov [rbx+(rcx-1)*8], {register}");
     }
 
-    private static void Peek(TextWriter output, string register)
+    private void Peek(string register)
     {
-        void O(string s) => output.WriteLine(s);
-        O(@"    mov rbx, [rel stack]");
-        O(@"    mov rcx, [rel stack_ptr]");
-        O($"    mov {register}, [rbx+(rcx-1)*8]");
+        _asm.Str(@"    mov rbx, [rel stack]")
+            .Str(@"    mov rcx, [rel stack_ptr]")
+            .Str($"    mov {register}, [rbx+(rcx-1)*8]");
     }
 
     /*****************************************\
      *             Data Sections             *
      *****************************************/
 
-    private void WriteBss(TextWriter output)
+    private void WriteBss()
     {
-        void O(string s) => output.WriteLine(s);
-        O("; Uninitialized Globals:");
-        O("    section .bss");
-        O("references: RESQ 32");
-        O("stack: RESQ 1");
-        O("string_buffer: RESB 32");
-        O($"stdout_buffer: RESB {_config.StdoutBufferSize}");
+        _asm.Str("; Uninitialized Globals:")
+            .Str("    section .bss")
+            .Str("references: RESQ 32")
+            .Str("stack: RESQ 1")
+            .Str("string_buffer: RESB 32")
+            .Str($"stdout_buffer: RESB {_config.StdoutBufferSize}");
     }
 
-    private static void WriteData(TextWriter output)
+    private void WriteData()
     {
-        void O(string s) => output.WriteLine(s);
-        O("; Globals:");
-        O("    section .data");
-        O("stack_ptr: DQ 0");
-        O("stdout_len: DW 0");
+        _asm.Str("; Globals:")
+            .Str("    section .data")
+            .Str("stack_ptr: DQ 0")
+            .Str("stdout_len: DW 0");
     }
 
-    private static void WriteRoData(Program program, TextWriter output)
+    private void WriteRoData(Program program)
     {
-        void O(string s) => output.WriteLine(s);
-        O("; Constants:");
-        O("    section .rodata");
+        _asm.Str("; Constants:")
+            .Str("    section .rodata");
         foreach (var entry in program.Strings)
         {
             var (key, value) = entry;
-            O($"{GetStringLabel(key)}: DB {value.Escape('`')}");
-            O($"{GetStringLenLabel(key)}: EQU $ - {GetStringLabel(key)}");
+            _asm.Str($"{GetStringLabel(key)}: DB {value.Escape('`')}")
+                .Str($"{GetStringLenLabel(key)}: EQU $ - {GetStringLabel(key)}");
         }
 
-        O("");
-        O("; Constant Constants:");
+        _asm.Str();
+        _asm.Com("Constant Constants:");
         foreach (var entry in Strings)
         {
             var (key, value) = entry;
-            O($"{key}: DB {value.Escape('`')}");
-            O($"{key}_len: EQU $ - {key}");
+            _asm.Str($"{key}: DB {value.Escape('`')}")
+                .Str($"{key}_len: EQU $ - {key}");
         }
     }
 }
