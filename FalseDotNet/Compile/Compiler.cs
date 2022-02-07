@@ -92,6 +92,8 @@ public class Compiler : ICompiler
         }
 
         WriteDecimalConverter(output);
+        WritePrintCharacter(output);
+        WriteFlushStdout(output);
     }
 
     private void WriteSetup(TextWriter output)
@@ -357,6 +359,7 @@ public class Compiler : ICompiler
             case Operation.OutputChar:
                 // In the future, write to a buffer instead, and use the flush command 'ß' to write to stdout.
                 // A syscall for every character is not efficient.
+                /*
                 Pop(output, "rax");
                 O("    push rax");
                 O("    mov rax, SYS_WRITE");
@@ -365,6 +368,9 @@ public class Compiler : ICompiler
                 O("    mov rdx, 1");
                 O("    syscall");
                 O("    add rsp, 8");
+                */
+                Pop(output, "rdi");
+                O("    call print_character");
                 break;
 
             case Operation.OutputDecimal:
@@ -373,7 +379,7 @@ public class Compiler : ICompiler
                 break;
             
             case Operation.Flush:
-                // TODO
+                O("    call flush_stdout");
                 break;
 
             case Operation.Exit:
@@ -392,6 +398,11 @@ public class Compiler : ICompiler
         O("; Converts rdi to decimal and writes to stdout.");
         O("print_decimal:");
 
+        // For now, flush stdout. In the future, this function will also write into the buffer.
+        O("    push rdi");
+        O("    call flush_stdout");
+        O("    pop rdi");
+        
         // rax: number, rsi: isNegative, rbx: string base, rcx: string index
         // rdx: modulo
 
@@ -438,6 +449,58 @@ public class Compiler : ICompiler
         O("    ret");
     }
 
+    private void WritePrintCharacter(TextWriter output)
+    {
+        void O(string s) => output.WriteLine(s);
+        O("");
+        O("; Prints character located in dil.");
+        O("print_character:");
+        O("    lea rsi, [rel stdout_buffer]");
+        O("    xor rdx, rdx");
+        O("    mov dx, [rel stdout_len]");
+        O("    mov [rsi+rdx], rdi");
+        O("    inc dx");
+        O("    mov r8b, 0");
+        O("    mov r9b, 0");
+        O("    mov r10b, 0xff");
+        O($"    cmp dx, {_config.StdoutBufferSize}");
+        O("    cmove r8, r10");
+        O("    cmp dil, 10"); // flush on newlines
+        O("    cmove r9, r10");
+        O("    or r8b, r9b");
+        O("    cmp r8b, 0");
+        O("    jz print_character_ret");
+        O("    mov rax, SYS_WRITE");
+        O("    mov rdi, 1");
+        // rsi is already pointing to the string
+        // rdx is already the length of the string
+        O("    syscall");
+        O("    mov dx, 0");
+        O("print_character_ret:");
+        O("    mov [rel stdout_len], dx");
+        O("    ret");
+    }
+
+    private void WriteFlushStdout(TextWriter output)
+    {
+        void O(string s) => output.WriteLine(s);
+        O("");
+        O("; Flushes stdout.");
+        O("flush_stdout:");
+        O("    lea rsi, [rel stdout_buffer]");
+        O("    xor rdx, rdx");
+        O("    mov dx, [rel stdout_len]");
+        O("    cmp dx, 0");
+        O("    jz flush_stdout_ret");
+        O("    mov rax, SYS_WRITE");
+        O("    mov rdi, 1");
+        O("    syscall");
+        O("    mov dx, 0");
+        O("    mov [rel stdout_len], dx");
+        O("flush_stdout_ret:");
+        O("    ret");
+    }
+
     /*****************************************\
      *            Common Patterns            *
      *****************************************/
@@ -450,6 +513,9 @@ public class Compiler : ICompiler
     private static void PrintString(TextWriter output, string strLabel, string lenLabel, int fd = 1)
     {
         void O(string s) => output.WriteLine(s);
+        O(@"    push rdi");
+        O( @"    call flush_stdout");
+        O(@"    pop rdi");
         O(@"    mov rax, SYS_WRITE");
         O($"    mov rdi, {fd}"); // stdout
         O($"    lea rsi, [rel {strLabel}]");
@@ -518,7 +584,7 @@ public class Compiler : ICompiler
      *             Data Sections             *
      *****************************************/
 
-    private static void WriteBss(TextWriter output)
+    private void WriteBss(TextWriter output)
     {
         void O(string s) => output.WriteLine(s);
         O("; Uninitialized Globals:");
@@ -526,6 +592,7 @@ public class Compiler : ICompiler
         O("references: RESQ 32");
         O("stack: RESQ 1");
         O("string_buffer: RESB 32");
+        O($"stdout_buffer: RESB {_config.StdoutBufferSize}");
     }
 
     private static void WriteData(TextWriter output)
@@ -534,6 +601,7 @@ public class Compiler : ICompiler
         O("; Globals:");
         O("    section .data");
         O("stack_ptr: DQ 0");
+        O("stdout_len: DW 0");
     }
 
     private static void WriteRoData(Program program, TextWriter output)

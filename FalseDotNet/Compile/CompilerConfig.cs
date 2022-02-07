@@ -21,4 +21,9 @@ public class CompilerConfig
     /// The size of the buffer used for number-to-string conversion.
     /// </summary>
     public long StringBufferSize { get; set; } = 32;
+
+    /// <summary>
+    /// The size of the buffer used for stdout buffering.
+    /// </summary>
+    public long StdoutBufferSize { get; set; } = 128;
 }
