@@ -64,6 +64,17 @@ public class AddressTests
     }
 
     [Fact]
+    public void ToString_OnlyBaseAndOffset()
+    {
+        var address = new Address
+        (
+            new Register(ERegister.sp, ERegisterSize.r),
+            AddressOffset: 8
+        );
+        address.ToString().Should().Be("[rsp+8]");
+    }
+
+    [Fact]
     public void ToString_AllProperties()
     {
         var address = new Address

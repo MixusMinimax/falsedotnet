@@ -25,9 +25,21 @@ public record Instruction(Mnemonic Mnemonic, params IOperand[] Operands) : IAsmL
                 _modifiedRegisters.Add(ERegister.dx);
                 break;
 
-            case Mnemonic.Cmp:
+            case Mnemonic.Cmp or Mnemonic.Ret:
                 break;
 
+            case Mnemonic.Push:
+                _modifiedRegisters.Add(ERegister.sp);
+                break;
+
+            case Mnemonic.Pop:
+                _modifiedRegisters.Add(ERegister.sp);
+                _modifiedRegisters.Add(((Register)Operands[0]).Name);
+                break;
+
+            case Mnemonic.Call:
+                _modifiedRegisters.AddRange(Enum.GetValues<ERegister>());
+                break;
             case Mnemonic.Syscall:
                 _modifiedRegisters.Add(ERegister.ax);
                 _modifiedRegisters.Add(ERegister.cx);
@@ -46,11 +58,14 @@ public record Instruction(Mnemonic Mnemonic, params IOperand[] Operands) : IAsmL
 public enum Mnemonic
 {
     Mov,
+    Lea,
 
     // Arithmetic
     Add,
     Sub,
     Neg,
+    Inc,
+    Dec,
     IMul,
     IDiv,
 
@@ -73,5 +88,13 @@ public enum Mnemonic
     CMovE,
     CMovL,
 
-    Syscall
+    // Memory
+    Push,
+    Pop,
+
+    // Functions
+    Call,
+    Syscall,
+
+    Ret,
 }

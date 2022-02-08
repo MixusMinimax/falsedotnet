@@ -1,4 +1,5 @@
-﻿using FalseDotNet.Commands;
+﻿using System.Diagnostics.CodeAnalysis;
+using FalseDotNet.Commands;
 using FalseDotNet.Compile.Instructions;
 using FalseDotNet.Compile.Optimization;
 using FalseDotNet.Parse;
@@ -13,12 +14,20 @@ public class Compiler : ICompiler
     private static readonly Register Rbx = new Register(ERegister.bx, ERegisterSize.r);
     private static readonly Register Rcx = new Register(ERegister.cx, ERegisterSize.r);
     private static readonly Register Rdx = new Register(ERegister.dx, ERegisterSize.r);
+    private static readonly Register Dx = new Register(ERegister.dx, ERegisterSize.w);
+    private static readonly Register Dl = new Register(ERegister.dx, ERegisterSize.l);
     private static readonly Register Rdi = new Register(ERegister.di, ERegisterSize.r);
+    private static readonly Register Dil = new Register(ERegister.di, ERegisterSize.l);
     private static readonly Register Rsi = new Register(ERegister.si, ERegisterSize.r);
     private static readonly Register R8 = new Register(ERegister.r8, ERegisterSize.r);
+    private static readonly Register R8B = new Register(ERegister.r8, ERegisterSize.l);
     private static readonly Register R9 = new Register(ERegister.r9, ERegisterSize.r);
+    private static readonly Register R9B = new Register(ERegister.r9, ERegisterSize.l);
     private static readonly Register R10 = new Register(ERegister.r10, ERegisterSize.r);
+    private static readonly Register R11 = new Register(ERegister.r11, ERegisterSize.r);
+    private static readonly Register Rsp = new Register(ERegister.sp, ERegisterSize.r);
 
+    [SuppressMessage("ReSharper", "StringLiteralTypo")]
     private static readonly Dictionary<string, string> Macros = new()
     {
         ["SYS_WRITE"]     = "1",
@@ -32,6 +41,7 @@ public class Compiler : ICompiler
         ["MAP_ANONYMOUS"] = "0b00100000"
     };
 
+    [SuppressMessage("ReSharper", "StringLiteralTypo")]
     private static readonly Dictionary<string, string> Strings = new()
     {
         ["mmap_error"] = "MMAP Failed! Exiting.\n",
@@ -117,6 +127,7 @@ public class Compiler : ICompiler
         WriteFlushStdout();
     }
 
+    [SuppressMessage("ReSharper", "StringLiteralTypo")]
     private void WriteSetup()
     {
         _asm.Com("===[SETUP START]===")
@@ -176,14 +187,14 @@ public class Compiler : ICompiler
 
             case Operation.IntLiteral:
                 _asm.Mov(Rax, argument);
-                Push("rax");
+                Push(Rax);
                 break;
 
             // Stack
 
             case Operation.Dup:
-                Peek("rax");
-                Push("rax");
+                Peek(Rax);
+                Push(Rax);
                 break;
 
             case Operation.Drop:
@@ -211,7 +222,7 @@ public class Compiler : ICompiler
                 break;
 
             case Operation.Pick:
-                Peek("rax"); // Offset
+                Peek(Rax); // Offset
                 _asm.Mov(Rsi, Rcx)
                     .Sub(Rsi, Rax)
                     .Mov(Rax, new Address(Rbx, Rsi, -2, 8))
@@ -221,28 +232,28 @@ public class Compiler : ICompiler
             // Arithmetic
 
             case Operation.Add:
-                Pop("rax");
+                Pop(Rax);
                 _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
                     .Add(Rax, Rdx)
                     .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             case Operation.Sub:
-                Pop("rax");
+                Pop(Rax);
                 _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
                     .Sub(Rdx, Rax)
                     .Mov(new Address(Rbx, Rcx, -1, 8), Rdx);
                 break;
 
             case Operation.Mul:
-                Pop("rax");
+                Pop(Rax);
                 _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
                     .Mul(Rax, Rdx)
                     .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             case Operation.Div:
-                Pop("rdi");
+                Pop(Rdi);
                 _asm.Mov(Rax, new Address(Rbx, Rcx, -1, 8))
                     .Zro(Rdx)
                     .Mov(Rsi, Rdx)
@@ -254,27 +265,27 @@ public class Compiler : ICompiler
                 break;
 
             case Operation.Neg:
-                Peek("rax");
+                Peek(Rax);
                 _asm.Neg(Rax)
                     .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             case Operation.And:
-                Pop("rax");
+                Pop(Rax);
                 _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
                     .And(Rax, Rdx)
                     .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             case Operation.Or:
-                Pop("rax");
+                Pop(Rax);
                 _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
                     .Or(Rax, Rdx)
                     .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             case Operation.Not:
-                Peek("rax");
+                Peek(Rax);
                 _asm.Not(Rax)
                     .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
@@ -282,90 +293,90 @@ public class Compiler : ICompiler
             // Comparison
 
             case Operation.Eq:
-                Pop("rax");
-                _asm.Str(@"    mov rdx, [rbx+(rcx-1)*8]")
-                    .Str("    cmp rax, rdx")
-                    .Str("    mov rax, 0")
-                    .Str("    mov rdx, 0xffffffffffffffff")
-                    .Str("    cmove rax, rdx")
-                    .Str("    mov [rbx+(rcx-1)*8], rax");
+                Pop(Rax);
+                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
+                    .Cmp(Rax, Rdx)
+                    .Mov(Rax, 0) // "xor rax, rax" would affect the status register
+                    .Mov(Rdx, -1)
+                    .Ins(Mnemonic.CMovE, Rax, Rdx)
+                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             case Operation.Gt:
-                Pop("rax");
-                _asm.Str(@"    mov rdx, [rbx+(rcx-1)*8]")
-                    .Str("    cmp rax, rdx")
-                    .Str("    mov rax, 0")
-                    .Str("    mov rdx, 0xffffffffffffffff")
-                    .Str("    cmovl rax, rdx")
-                    .Str("    mov [rbx+(rcx-1)*8], rax");
+                Pop(Rax);
+                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
+                    .Cmp(Rax, Rdx)
+                    .Mov(Rax, 0)
+                    .Mov(Rdx, -1)
+                    .Ins(Mnemonic.CMovL, Rax, Rdx)
+                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
                 break;
 
             // Control Flow and Lambdas
 
             case Operation.Lambda:
-                _asm.Str($"    lea rax, [rel {GetLabel(program, argument)}]");
-                Push("rax");
+                _asm.Lea(Rax, GetLabel(program, argument));
+                Push(Rax);
                 break;
 
             case Operation.Ret:
-                _asm.Str("    ret");
+                _asm.Ins(Mnemonic.Ret);
                 break;
 
             case Operation.Execute:
-                Pop("rax");
-                _asm.Str($"    call rax");
+                Pop(Rax);
+                _asm.Ins(Mnemonic.Call, Rax);
                 break;
 
             case Operation.ConditionalExecute:
                 var label = GenerateNewLabel();
-                Pop("rax"); // body
-                Pop("rdx"); // condition
-                _asm.Str(@"    cmp rdx, 0")
-                    .Str($"    jz {label}")
-                    .Str(@"    call rax")
-                    .Str($"{label}:");
+                Pop(Rax); // body
+                Pop(Rdx); // condition
+                _asm.Cmp(Rdx, 0)
+                    .Jz(label)
+                    .Ins(Mnemonic.Call, Rax)
+                    .Lbl(label);
                 break;
 
             case Operation.WhileInit:
-                Pop("rax"); // body
-                _asm.Str("    push rax");
-                Pop("rax"); // condition
-                _asm.Str("    push rax");
+                Pop(Rax); // body
+                _asm.Ins(Mnemonic.Push, Rax);
+                Pop(Rax); // condition
+                _asm.Ins(Mnemonic.Push, Rax);
                 var loop = GenerateNewLabel();
                 var condition = GenerateNewLabel();
-                _asm.Str($"    jmp {condition}")
-                    .Str($"{loop}:")
-                    .Str(@"    mov rax, [rsp+8]")
-                    .Str(@"    call rax")
-                    .Str($"{condition}:")
-                    .Str(@"    mov rax, [rsp]")
-                    .Str(@"    call rax");
-                Pop("rax");
-                _asm.Str(@"    cmp rax, 0")
-                    .Str($"    jnz {loop}")
-                    .Str(@"    add rsp, 16");
+                _asm.Jmp(condition)
+                    .Lbl(loop)
+                    .Mov(Rax, new Address(Rsp, AddressOffset: 8))
+                    .Ins(Mnemonic.Call, Rax)
+                    .Lbl(condition)
+                    .Mov(Rax, new Address(Rsp))
+                    .Ins(Mnemonic.Call, Rax);
+                Pop(Rax);
+                _asm.Cmp(Rax, 0)
+                    .Jne(loop)
+                    .Add(Rsp, 16);
                 break;
 
             // Names
 
             case Operation.Ref:
-                _asm.Str($"    mov rax, {argument}");
-                Push("rax");
+                _asm.Mov(Rax, argument);
+                Push(Rax);
                 break;
 
             case Operation.Store:
-                Pop("rax");
-                Pop("rdx");
-                _asm.Str("    lea rbx, [rel references]")
-                    .Str("    mov [rbx+rax*8], rdx");
+                Pop(Rax);
+                Pop(Rdx);
+                _asm.Lea(Rbx, "references")
+                    .Mov(new Address(Rbx, Rax, Stride: 8), Rdx);
                 break;
 
             case Operation.Load:
-                Peek("rax");
-                _asm.Str("    lea rbx, [rel references]")
-                    .Str("    mov rdx, [rbx+rax*8]");
-                Replace("rdx");
+                Peek(Rax);
+                _asm.Lea(Rbx, "references")
+                    .Mov(Rdx, new Address(Rbx, Rax, Stride: 8));
+                Replace(Rdx);
                 break;
 
             // I/O
@@ -375,21 +386,21 @@ public class Compiler : ICompiler
                 break;
 
             case Operation.OutputChar:
-                Pop("rdi");
-                _asm.Str("    call print_character");
+                Pop(Rdi);
+                _asm.Cll("print_character");
                 break;
 
             case Operation.OutputDecimal:
-                Pop("rdi");
-                _asm.Str("    call print_decimal");
+                Pop(Rdi);
+                _asm.Cll("print_decimal");
                 break;
 
             case Operation.Flush:
-                _asm.Str("    call flush_stdout");
+                _asm.Cll("flush_stdout");
                 break;
 
             case Operation.Exit:
-                Exit(0); // maybe exit with top of FALSE stack?
+                Exit(); // maybe exit with top of FALSE stack?
                 break;
 
             case Operation.WhileCondition or Operation.WhileBody:
@@ -399,109 +410,109 @@ public class Compiler : ICompiler
 
     private void WriteDecimalConverter()
     {
-        _asm.Str("")
-            .Str("; Converts rdi to decimal and writes to stdout.")
-            .Str("print_decimal:")
+        _asm.Str()
+            .Com("Converts rdi to decimal and writes to stdout.")
+            .Lbl("print_decimal")
 
             // For now, flush stdout. In the future, this function will also write into the buffer.
-            .Str("    push rdi")
-            .Str("    call flush_stdout")
-            .Str("    pop rdi")
+            .Ins(Mnemonic.Push, Rdi)
+            .Cll("flush_stdout")
+            .Ins(Mnemonic.Pop, Rdi)
 
             // rax: number, rsi: isNegative, rbx: string base, rcx: string index
             // rdx: modulo
 
             // 1. take the absolute and remember if number was negative.
-            .Str("    mov rax, rdi")
-            .Str("    neg rdi")
-            .Str("    mov r11, 0")
-            .Str("    mov rdx, -1")
-            .Str("    cmp rax, 0")
-            .Str("    cmovl r11, rdx")
-            .Str("    cmovl rax, rdi")
+            .Mov(Rax, Rdi)
+            .Neg(Rdi)
+            .Zro(R11)
+            .Mov(Rdx, -1)
+            .Cmp(Rax, 0)
+            .Ins(Mnemonic.CMovL, R11, Rdx)
+            .Ins(Mnemonic.CMovL, Rax, Rdi)
 
             // 2. Convert to decimal and store in string_buffer. (right to left)
             //    Count decimal places.
-            .Str("    mov rdi, 10")
-            .Str("    lea r8, [rel string_buffer]")
-            .Str($"    mov rcx, 0x{_config.StringBufferSize:x8}") // Start at the end
-            .Str("print_decimal_loop:")
-            .Str("    dec rcx")
-            .Str("    xor rdx, rdx")
-            .Str("    div rdi") // digit in rdi
-            .Str("    add dl, '0'")
-            .Str("    mov [r8,rcx], dl")
-            .Str("    cmp rax, 0")
-            .Str("    jne print_decimal_loop")
+            .Mov(Rdi, 10)
+            .Lea(R8, "string_buffer")
+            .Mov(Rcx, _config.StringBufferSize) // Start at the end
+            .Lbl("print_decimal_loop")
+            .Dec(Rcx)
+            .Zro(Rdx)
+            .Div(Rdi) // digit in rdi
+            .Add(Dl, '0')
+            .Mov(new Address(R8, Rcx), Dl)
+            .Cmp(Rax, 0)
+            .Jne("print_decimal_loop")
 
             // 3. Write '-' in front if number was negative.
             //    also, increment length counter
-            .Str("    cmp r11, 0")
-            .Str("    je print_decimal_skip")
-            .Str("    dec rcx")
-            .Str("    mov dl, '-'")
-            .Str("    mov [r8,rcx], dl")
-            .Str("print_decimal_skip:")
+            .Cmp(R11, 0)
+            .Je("print_decimal_skip")
+            .Dec(Rcx)
+            .Mov(Dl, '-')
+            .Mov(new Address(R8, Rcx), Dl)
+            .Lbl("print_decimal_skip")
 
             // 4. Pass string_buffer+32-length as pointer, length to write syscall.
-            .Str("    add r8, rcx")
-            .Str($"    mov rdx, 0x{_config.StringBufferSize:x8}")
-            .Str("    sub rdx, rcx")
-            .Str("    mov rax, SYS_WRITE")
-            .Str("    mov rdi, 1")
-            .Str("    mov rsi, r8")
-            .Str("    syscall")
-            .Str("    ret");
+            .Add(R8, Rcx)
+            .Mov(Rdx, _config.StringBufferSize)
+            .Sub(Rdx, Rcx)
+            .Mov(Rax, "SYS_WRITE")
+            .Mov(Rdi, 1)
+            .Mov(Rsi, R8)
+            .Syscall()
+            .Ins(Mnemonic.Ret);
     }
 
     private void WritePrintCharacter()
     {
-        _asm.Str("")
-            .Str("; Prints character located in dil.")
-            .Str("print_character:")
-            .Str("    lea rsi, [rel stdout_buffer]")
-            .Str("    xor rdx, rdx")
-            .Str("    mov dx, [rel stdout_len]")
-            .Str("    mov [rsi+rdx], rdi")
-            .Str("    inc dx")
-            .Str("    mov r8b, 0")
-            .Str("    mov r9b, 0")
-            .Str("    mov r10b, 0xff")
-            .Str($"    cmp dx, {_config.StdoutBufferSize}")
-            .Str("    cmove r8, r10")
-            .Str("    cmp dil, 10") // flush on newlines
-            .Str("    cmove r9, r10")
-            .Str("    or r8b, r9b")
-            .Str("    cmp r8b, 0")
-            .Str("    jz print_character_ret")
-            .Str("    mov rax, SYS_WRITE")
-            .Str("    mov rdi, 1")
+        _asm.Str()
+            .Com("Prints character located in dil.")
+            .Lbl("print_character")
+            .Lea(Rsi, "stdout_buffer")
+            .Zro(Rdx)
+            .Mov(Dx, new LabelAddress("stdout_len"))
+            .Mov(new Address(Rsi, Rdx), Rdi)
+            .Inc(Dx)
+            .Mov(new Register(ERegister.r8, ERegisterSize.l), 0)
+            .Mov(new Register(ERegister.r9, ERegisterSize.l), 0)
+            .Mov(new Register(ERegister.r9, ERegisterSize.l), -1)
+            .Cmp(Dx, _config.StdoutBufferSize)
+            .Ins(Mnemonic.CMovE, R8, R10)
+            .Cmp(Dil, 10) // flush on newlines
+            .Ins(Mnemonic.CMovE, R9, R10)
+            .Or(R8B, R9B)
+            .Cmp(R8B, 0)
+            .Jz("print_character_ret")
+            .Mov(Rax, "SYS_WRITE")
+            .Mov(Rdi, 1)
             // rsi is already pointing to the string
             // rdx is already the length of the string
-            .Str("    syscall")
-            .Str("    mov dx, 0")
-            .Str("print_character_ret:")
-            .Str("    mov [rel stdout_len], dx")
-            .Str("    ret");
+            .Syscall()
+            .Zro(Dx)
+            .Lbl("print_character_ret")
+            .Mov(new LabelAddress("stdout_len"), Dx)
+            .Ins(Mnemonic.Ret);
     }
 
     private void WriteFlushStdout()
     {
-        _asm.Str("")
-            .Str("; Flushes stdout.")
-            .Str("flush_stdout:")
-            .Str("    lea rsi, [rel stdout_buffer]")
-            .Str("    xor rdx, rdx")
-            .Str("    mov dx, [rel stdout_len]")
-            .Str("    cmp dx, 0")
-            .Str("    jz flush_stdout_ret")
-            .Str("    mov rax, SYS_WRITE")
-            .Str("    mov rdi, 1")
-            .Str("    syscall")
-            .Str("    mov dx, 0")
-            .Str("    mov [rel stdout_len], dx")
-            .Str("flush_stdout_ret:")
-            .Str("    ret");
+        _asm.Str()
+            .Com("Flushes stdout.")
+            .Lbl("flush_stdout")
+            .Lea(Rsi, "stdout_buffer")
+            .Zro(Rdx)
+            .Mov(Dx, new LabelAddress("stdout_len"))
+            .Cmp(Dx, 0)
+            .Jz("flush_stdout_ret")
+            .Mov(Rax, "SYS_WRITE")
+            .Mov(Rdi, 1)
+            .Syscall()
+            .Zro(Dx)
+            .Mov(new LabelAddress("stdout_len"), Dx)
+            .Lbl("flush_stdout_ret")
+            .Ins(Mnemonic.Ret);
     }
 
     /*****************************************\
@@ -515,75 +526,77 @@ public class Compiler : ICompiler
 
     private void PrintString(string strLabel, string lenLabel, int fd = 1)
     {
-        _asm.Str(@"    push rdi")
-            .Str(@"    call flush_stdout")
-            .Str(@"    pop rdi")
-            .Str(@"    mov rax, SYS_WRITE")
-            .Str($"    mov rdi, {fd}") // stdo
-            .Str($"    lea rsi, [rel {strLabel}]")
-            .Str($"    mov rdx, {lenLabel}")
-            .Str(@"    syscall");
+        _asm.Ins(Mnemonic.Push, Rdi)
+            .Cll("flush_stdout")
+            .Ins(Mnemonic.Pop, Rdi)
+            .Mov(Rax, "SYS_WRITE")
+            .Mov(Rdi, fd) // stdout
+            .Lea(Rsi, strLabel)
+            .Mov(Rdx, new LabelOperand(lenLabel))
+            .Syscall();
     }
 
-    private void Exit(int exitCode = 0)
+    private void Exit(long exitCode = 0)
     {
-        Exit($"{exitCode}");
+        Exit(new Literal(exitCode));
     }
 
-    private void Exit(string exitCode)
+    private void Exit(IOperand exitCode)
     {
-        _asm.Str(@"    mov rax, SYS_EXIT")
-            .Str($"    mov rdi, {exitCode}")
-            .Str(@"    syscall");
+        _asm.Mov(Rax, "SYS_EXIT")
+            .Mov(Rdi, exitCode)
+            .Syscall();
     }
 
-    private void Push(string register)
+    private void Push(IOperand register)
     {
-        _asm.Str(@"    mov rbx, [rel stack]")
-            .Str(@"    mov rcx, [rel stack_ptr]")
-            .Str($"    mov [rbx,rcx*8], {register}")
-            .Str(@"    inc rcx")
-            .Str(@"    mov [rel stack_ptr], rcx");
+        _asm.Mov(Rbx, new LabelAddress("stack"))
+            .Mov(Rcx, new LabelAddress("stack_ptr"))
+            .Mov(new Address(Rbx, Rcx, Stride: 8), register)
+            .Inc(Rcx)
+            .Mov(new LabelAddress("stack_ptr"), Rcx);
     }
 
-    private void Pop(string register)
+    private void Pop(IOperand register)
     {
-        _asm.Str(@"    mov rbx, [rel stack]")
-            .Str(@"    mov rcx, [rel stack_ptr]")
-            .Str(@"    dec rcx")
-            .Str($"    mov {register}, [rbx,rcx*8]")
-            .Str(@"    mov [rel stack_ptr], rcx");
+        _asm.Mov(Rbx, new LabelAddress("stack"))
+            .Mov(Rcx, new LabelAddress("stack_ptr"))
+            .Dec(Rcx)
+            .Mov(register, new Address(Rbx, Rcx, Stride: 8))
+            .Mov(new LabelAddress("stack_ptr"), Rcx);
     }
 
     private void Drop()
     {
-        _asm.Str(@"    mov rcx, [rel stack_ptr]")
-            .Str(@"    dec rcx")
-            .Str(@"    mov [rel stack_ptr], rcx");
+        _asm.Mov(Rcx, new LabelAddress("stack_ptr"))
+            .Dec(Rcx)
+            .Mov(new LabelAddress("stack_ptr"), Rcx);
     }
 
-    private void Replace(string register)
+    private void Replace(IOperand register)
     {
-        _asm.Str(@"    mov rbx, [rel stack]")
-            .Str(@"    mov rcx, [rel stack_ptr]")
-            .Str($"    mov [rbx+(rcx-1)*8], {register}");
+        _asm.Mov(Rbx, new LabelAddress("stack"))
+            .Mov(Rcx, new LabelAddress("stack_ptr"))
+            .Mov(new Address(Rbx, Rcx, -1, 8), register);
     }
 
-    private void Peek(string register)
+    private void Peek(IOperand register)
     {
-        _asm.Str(@"    mov rbx, [rel stack]")
-            .Str(@"    mov rcx, [rel stack_ptr]")
-            .Str($"    mov {register}, [rbx+(rcx-1)*8]");
+        _asm.Mov(Rbx, new LabelAddress("stack"))
+            .Mov(Rcx, new LabelAddress("stack_ptr"))
+            .Mov(register, new Address(Rbx, Rcx, -1, 8));
     }
 
     /*****************************************\
      *             Data Sections             *
      *****************************************/
 
+    [SuppressMessage("ReSharper", "StringLiteralTypo")]
     private void WriteBss()
     {
-        _asm.Str("; Uninitialized Globals:")
-            .Str("    section .bss")
+        // I can leave these lines as literal strings, as they won't be optimized.
+        _asm.Com("Uninitialized Globals:")
+            .Sec(ESection.Bss)
             .Str("references: RESQ 32")
             .Str("stack: RESQ 1")
             .Str("string_buffer: RESB 32")
@@ -592,16 +605,16 @@ public class Compiler : ICompiler
 
     private void WriteData()
     {
-        _asm.Str("; Globals:")
-            .Str("    section .data")
+        _asm.Com("Globals:")
+            .Sec(ESection.Data)
             .Str("stack_ptr: DQ 0")
             .Str("stdout_len: DW 0");
     }
 
     private void WriteRoData(Program program)
     {
-        _asm.Str("; Constants:")
-            .Str("    section .rodata");
+        _asm.Com("Constants:")
+            .Sec(ESection.RoData);
         foreach (var entry in program.Strings)
         {
             var (key, value) = entry;

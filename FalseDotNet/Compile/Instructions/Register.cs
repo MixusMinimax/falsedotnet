@@ -33,6 +33,18 @@ public enum ERegisterSize
     r
 }
 
+public static class RegisterSizeExtensions
+{
+    public static int NumBytes(this ERegisterSize size) => size switch
+    {
+        ERegisterSize.l or ERegisterSize.h => 1,
+        ERegisterSize.w => 2,
+        ERegisterSize.e => 4,
+        ERegisterSize.r => 8,
+        _ => throw new Exception("unreachable")
+    };
+}
+
 public record Register : IOperand
 {
     public readonly ERegister Name;
