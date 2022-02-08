@@ -13,6 +13,8 @@ Also, the esolang wiki: [esolang.org/wiki/FALSE](https://esolangs.org/wiki/FALSE
 
 ## Quick Start
 
+`cd` into `FalseDotNet.Cli`.
+
 ```ps
 $ dotnet run help
 FalseDotNet.Cli 1.0.0
@@ -29,9 +31,11 @@ Copyright (C) 2022 FalseDotNet.Cli
 
 ### Interpret a program:
 
+`cd` into `FalseDotNet.Cli`.
+
 Example:
 ```ps
-dotnet run interpret .\samples\simple.f
+dotnet run interpret ..\samples\simple.f
 ```
 
 Usage:
@@ -51,10 +55,12 @@ Copyright (C) 2022 FalseDotNet.Cli
 
 ### Compile a program:
 
+`cd` into `FalseDotNet.Cli`.
+
 Examples:
 ```ps
-dotnet run -- compile -o .\out\simple.asm .\samples\simple.f
-dotnet run -- compile -al -o .\out\simple.asm .\samples\simple.f
+dotnet run -- compile -o ..\out\simple.asm ..\samples\simple.f
+dotnet run -- compile -al -o ..\out\simple.asm ..\samples\simple.f
 ```
 
 On Linux, `nasm` and `ld` are executed as Child processes directly. On Windows, those commands are passed to `bash.exe -c "..."` (Make sure you have WSL installed!)
