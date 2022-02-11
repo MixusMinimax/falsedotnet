@@ -38,7 +38,8 @@ public class CompileCommand : SubCommand<CompileOptions>
                     2 => OptimizerConfig.EOptimizationLevel.O2,
                     _ => throw new ArgumentException("Optimization level must be one of O0, O1, O2!")
                 }
-            }
+            },
+            TypeSafety = options.TypeSafety
         };
     }
 

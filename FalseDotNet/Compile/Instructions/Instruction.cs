@@ -79,6 +79,7 @@ public enum Mnemonic
 
     // Jump
     Jmp,
+    Jge,
     Jne,
     Je,
     Jnz,

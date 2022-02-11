@@ -6,5 +6,5 @@ public record Command(Operation Op, long Argument = 0)
         => new(op);
 
     public override string ToString()
-        => $"{Op}{(Op.HasArgument() ? $", {Argument}" : "")};";
+        => $"{Op}{(Op.HasArgument() ? $", {Argument}" : "")}";
 }

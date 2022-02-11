@@ -67,6 +67,9 @@ public static class AsmExtensions
     public static Asm And(this Asm asm, IOperand destination, IOperand source)
         => asm.Ins(Mnemonic.And, destination, source);
 
+    public static Asm And(this Asm asm, IOperand destination, long source)
+        => asm.Ins(Mnemonic.And, destination, new Literal(source));
+
     public static Asm Or(this Asm asm, IOperand destination, IOperand source)
         => asm.Ins(Mnemonic.Or, destination, source);
 
@@ -93,6 +96,9 @@ public static class AsmExtensions
 
     public static Asm Jne(this Asm asm, string label)
         => asm.Ins(Mnemonic.Jne, new LabelOperand(label));
+
+    public static Asm Jge(this Asm asm, string label)
+        => asm.Ins(Mnemonic.Jge, new LabelOperand(label));
 
     public static Asm Jz(this Asm asm, string label)
         => asm.Ins(Mnemonic.Jz, new LabelOperand(label));

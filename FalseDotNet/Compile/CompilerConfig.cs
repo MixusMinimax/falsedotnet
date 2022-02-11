@@ -1,4 +1,5 @@
 ﻿using FalseDotNet.Compile.Optimization;
+using FalseDotNet.Utility;
 
 namespace FalseDotNet.Compile;
 
@@ -15,7 +16,7 @@ public class CompilerConfig
     public bool WriteCommandComments { get; set; } = true;
 
     /// <summary>
-    /// Size of the FALSE stack. Grows downwards.
+    /// Size of the FALSE stack.
     /// </summary>
     public long StackSize { get; set; } = 65_536;
 
@@ -28,6 +29,8 @@ public class CompilerConfig
     /// The size of the buffer used for stdout buffering.
     /// </summary>
     public long StdoutBufferSize { get; set; } = 128;
+
+    public TypeSafety TypeSafety { get; set; } = TypeSafety.None;
 
     public OptimizerConfig OptimizerConfig { get; set; } = new();
 }

@@ -10,21 +10,26 @@ namespace FalseDotNet.Compile;
 public class Compiler : ICompiler
 {
     // @formatter:int_align_fields true
-    private static readonly Register Rax = new(ERegister.ax, ERegisterSize.r);
-    private static readonly Register Rbx = new(ERegister.bx, ERegisterSize.r);
-    private static readonly Register Rcx = new(ERegister.cx, ERegisterSize.r);
-    private static readonly Register Rdx = new(ERegister.dx, ERegisterSize.r);
-    private static readonly Register Dx  = new(ERegister.dx, ERegisterSize.w);
-    private static readonly Register Dl  = new(ERegister.dx, ERegisterSize.l);
-    private static readonly Register Rdi = new(ERegister.di, ERegisterSize.r);
-    private static readonly Register Dil = new(ERegister.di, ERegisterSize.l);
-    private static readonly Register Rsi = new(ERegister.si, ERegisterSize.r);
-    private static readonly Register R8  = new(ERegister.r8, ERegisterSize.r);
-    private static readonly Register R8B = new(ERegister.r8, ERegisterSize.l);
-    private static readonly Register R9  = new(ERegister.r9, ERegisterSize.r);
-    private static readonly Register R9B = new(ERegister.r9, ERegisterSize.l);
-    private static readonly Register R10 = new(ERegister.r10, ERegisterSize.r);
-    private static readonly Register R11 = new(ERegister.r11, ERegisterSize.r);
+    private static readonly Register Rax  = new(ERegister.ax, ERegisterSize.r);
+    private static readonly Register Al   = new(ERegister.ax, ERegisterSize.l);
+    private static readonly Register Rbx  = new(ERegister.bx, ERegisterSize.r);
+    private static readonly Register Rcx  = new(ERegister.cx, ERegisterSize.r);
+    private static readonly Register Rdx  = new(ERegister.dx, ERegisterSize.r);
+    private static readonly Register Dx   = new(ERegister.dx, ERegisterSize.w);
+    private static readonly Register Dl   = new(ERegister.dx, ERegisterSize.l);
+    private static readonly Register Rdi  = new(ERegister.di, ERegisterSize.r);
+    private static readonly Register Dil  = new(ERegister.di, ERegisterSize.l);
+    private static readonly Register Rsi  = new(ERegister.si, ERegisterSize.r);
+    private static readonly Register Sil  = new(ERegister.si, ERegisterSize.l);
+    private static readonly Register R8   = new(ERegister.r8, ERegisterSize.r);
+    private static readonly Register R8B  = new(ERegister.r8, ERegisterSize.l);
+    private static readonly Register R9   = new(ERegister.r9, ERegisterSize.r);
+    private static readonly Register R9B  = new(ERegister.r9, ERegisterSize.l);
+    private static readonly Register R10  = new(ERegister.r10, ERegisterSize.r);
+    private static readonly Register R11  = new(ERegister.r11, ERegisterSize.r);
+    private static readonly Register R14  = new(ERegister.r14, ERegisterSize.r);
+    private static readonly Register R15B = new(ERegister.r15, ERegisterSize.l);
+
     private static readonly Register Rsp = new(ERegister.sp, ERegisterSize.r);
     // @formatter:int_align_fields restore
 
@@ -46,7 +51,10 @@ public class Compiler : ICompiler
     [SuppressMessage("ReSharper", "StringLiteralTypo")]
     private static readonly Dictionary<string, string> Strings = new()
     {
-        ["mmap_error"] = "MMAP Failed! Exiting.\n",
+        ["mmap_error"]            = "MMAP Failed! Exiting.\n",
+        ["err_msg_pop_number"]    = "Tried to pop Number from stack!\n",
+        ["err_msg_pop_lambda"]    = "Tried to pop Lambda from stack!\n",
+        ["err_msg_pop_reference"] = "Tried to pop Reference from stack!\n",
     };
     // @formatter:int_align_assignments restore
 
@@ -65,6 +73,8 @@ public class Compiler : ICompiler
 
     public void Compile(Program program, TextWriter output, CompilerConfig config)
     {
+        _logger.WriteLine($"  Type Safety: {config.TypeSafety}");
+
         _config = config;
         _asm = new Asm();
 
@@ -126,31 +136,47 @@ public class Compiler : ICompiler
 
         WriteDecimalConverter();
         WritePrintCharacter();
+        WritePrintString();
         WriteFlushStdout();
     }
 
     [SuppressMessage("ReSharper", "StringLiteralTypo")]
     private void WriteSetup()
     {
+        void MMap(long size)
+        {
+            var skipLabel = $"skip_mmap_error_{_idGenerator.NewId}";
+            _asm.Mov(Rax, "SYS_MMAP")
+                .Zro(Rdi)
+                .Mov(Rsi, size)
+                .Mov(Rdx, "PROT_READ | PROT_WRITE")
+                .Mov(R10, "MAP_PRIVATE | MAP_ANONYMOUS")
+                .Mov(R8, -1)
+                .Zro(R9)
+                .Syscall()
+                .Com("Check for mmap success", true)
+                .Cmp(Rax, 0)
+                .Jge(skipLabel)
+                .Com("Print the fact that mmap failed", true);
+            PrintString("mmap_error", "mmap_error_len", 2);
+            Exit(1);
+            _asm.Lbl(skipLabel);
+        }
+
         _asm.Com("===[SETUP START]===")
-            .Com("Allocate FALSE stack:", true)
-            .Mov(Rax, "SYS_MMAP")
-            .Zro(Rdi)
-            .Mov(Rsi, _config.StackSize)
-            .Mov(Rdx, "PROT_READ | PROT_WRITE")
-            .Mov(R10, "MAP_PRIVATE | MAP_ANONYMOUS")
-            .Mov(R8, -1)
-            .Zro(R9)
-            .Syscall()
-            .Com("Check for mmap success", true)
-            .Cmp(Rax, -1)
-            .Jne("skip_mmap_error")
-            .Com(@"Print the fact that mmap failed", true);
-        PrintString("mmap_error", "mmap_error_len", 2);
-        Exit(1);
-        _asm.Lbl(@"skip_mmap_error")
-            .Mov(new LabelAddress("stack"), Rax)
-            .Com(@"===[SETUP  END]===")
+            .Com("Allocate FALSE stack:", true);
+        MMap(_config.StackSize);
+        _asm.Mov(new LabelAddress("stack"), Rax);
+
+        if (_config.TypeSafety is not TypeSafety.None)
+        {
+            _asm.Str()
+                .Com("Allocate Type stack:", true);
+            MMap(_config.StackSize / 8);
+            _asm.Mov(new LabelAddress("type_stack"), Rax);
+        }
+
+        _asm.Com(@"===[SETUP  END]===")
             .Str();
     }
 
@@ -189,13 +215,14 @@ public class Compiler : ICompiler
 
             case Operation.IntLiteral:
                 _asm.Mov(Rax, argument);
-                Push(Rax);
+                Push(Rax, StackElementType.Number);
                 break;
 
             // Stack
 
             case Operation.Dup:
-                Peek(Rax);
+                Pop(Rax);
+                Push(Rax);
                 Push(Rax);
                 break;
 
@@ -207,9 +234,18 @@ public class Compiler : ICompiler
                 _asm.Mov(Rbx, new LabelAddress("stack"))
                     .Mov(Rcx, new LabelAddress("stack_ptr"))
                     .Mov(Rax, new Address(Rbx, Rcx, -1, 8))
-                    .Mov(Rdx, "[rbx+(rcx-2)*8]")
+                    .Mov(Rdx, new Address(Rbx, Rcx, -2, 8))
                     .Mov(new Address(Rbx, Rcx, -1, 8), Rdx)
                     .Mov(new Address(Rbx, Rcx, -2, 8), Rax);
+                if (_config.TypeSafety is not TypeSafety.None)
+                {
+                    _asm.Mov(Rbx, new LabelAddress("type_stack"))
+                        .Mov(Al, new Address(Rbx, Rcx, -1))
+                        .Mov(Dl, new Address(Rbx, Rcx, -2))
+                        .Mov(new Address(Rbx, Rcx, -1), Dl)
+                        .Mov(new Address(Rbx, Rcx, -2), Al);
+                }
+
                 break;
 
             case Operation.Rot:
@@ -221,104 +257,121 @@ public class Compiler : ICompiler
                     .Mov(new Address(Rbx, Rcx, -1, 8), Rsi)
                     .Mov(new Address(Rbx, Rcx, -2, 8), Rax)
                     .Mov(new Address(Rbx, Rcx, -3, 8), Rdx);
+                if (_config.TypeSafety is not TypeSafety.None)
+                {
+                    _asm.Mov(Rbx, new LabelAddress("type_stack"))
+                        .Mov(Al, new Address(Rbx, Rcx, -1))
+                        .Mov(Dl, new Address(Rbx, Rcx, -2))
+                        .Mov(Sil, new Address(Rbx, Rcx, -3))
+                        .Mov(new Address(Rbx, Rcx, -1), Sil)
+                        .Mov(new Address(Rbx, Rcx, -2), Al)
+                        .Mov(new Address(Rbx, Rcx, -3), Dl);
+                }
+
                 break;
 
             case Operation.Pick:
-                Peek(Rax); // Offset
+                Pop(Rax, StackElementType.Number); // Offset
                 _asm.Mov(Rsi, Rcx)
                     .Sub(Rsi, Rax)
-                    .Mov(Rax, new Address(Rbx, Rsi, -2, 8))
-                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
+                    .Mov(Rax, new Address(Rbx, Rsi, -1, 8));
+                if (_config.TypeSafety is not TypeSafety.None)
+                {
+                    _asm.Mov(Rbx, new LabelAddress("type_stack"))
+                        .Mov(R15B, new Address(Rbx, Rsi, -1));
+                }
+
+                Push(Rax);
                 break;
 
             // Arithmetic
 
             case Operation.Add:
-                Pop(Rax);
-                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
-                    .Add(Rax, Rdx)
-                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
+                Pop(Rax, StackElementType.Number);
+                Pop(Rdx, StackElementType.Number);
+                _asm.Add(Rax, Rdx);
+                Push(Rax, StackElementType.Number);
                 break;
 
             case Operation.Sub:
-                Pop(Rax);
-                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
-                    .Sub(Rdx, Rax)
-                    .Mov(new Address(Rbx, Rcx, -1, 8), Rdx);
+                Pop(Rax, StackElementType.Number);
+                Pop(Rdx, StackElementType.Number);
+                _asm.Sub(Rdx, Rax);
+                Push(Rdx, StackElementType.Number);
                 break;
 
             case Operation.Mul:
-                Pop(Rax);
-                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
-                    .Mul(Rax, Rdx)
-                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
+                Pop(Rax, StackElementType.Number);
+                Pop(Rdx, StackElementType.Number);
+                _asm.Mul(Rax, Rdx);
+                Push(Rax, StackElementType.Number);
                 break;
 
             case Operation.Div:
-                Pop(Rdi);
-                _asm.Mov(Rax, new Address(Rbx, Rcx, -1, 8))
-                    .Zro(Rdx)
+                Pop(Rdi, StackElementType.Number);
+                Pop(Rax, StackElementType.Number);
+                _asm.Zro(Rdx)
                     .Mov(Rsi, Rdx)
                     .Not(Rsi)
                     .Cmp(Rax, 0)
                     .Ins(Mnemonic.CMovL, Rdx, Rsi)
-                    .Div(Rdi)
-                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
+                    .Div(Rdi);
+                Push(Rax, StackElementType.Number);
                 break;
 
             case Operation.Neg:
-                Peek(Rax);
-                _asm.Neg(Rax)
-                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
+                Pop(Rax, StackElementType.Number);
+                _asm.Neg(Rax);
+                Push(Rax, StackElementType.Number);
                 break;
 
             case Operation.And:
-                Pop(Rax);
-                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
-                    .And(Rax, Rdx)
-                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
+                Pop(Rax, StackElementType.Number);
+                Pop(Rdx, StackElementType.Number);
+                _asm.And(Rax, Rdx);
+                Push(Rax, StackElementType.Number);
                 break;
 
             case Operation.Or:
-                Pop(Rax);
-                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
-                    .Or(Rax, Rdx)
-                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
+                Pop(Rax, StackElementType.Number);
+                Pop(Rdx, StackElementType.Number);
+                _asm.Or(Rax, Rdx);
+                Push(Rax, StackElementType.Number);
                 break;
 
             case Operation.Not:
-                Peek(Rax);
-                _asm.Not(Rax)
-                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
+                Pop(Rax, StackElementType.Number);
+                _asm.Not(Rax);
+                Push(Rax, StackElementType.Number);
                 break;
 
             // Comparison
 
             case Operation.Eq:
-                Pop(Rax);
-                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
-                    .Cmp(Rax, Rdx)
+                Pop(Rax, StackElementType.Number);
+                Pop(Rdx, StackElementType.Number);
+                _asm.Cmp(Rax, Rdx)
                     .Mov(Rax, 0) // "xor rax, rax" would affect the status register
                     .Mov(Rdx, -1)
-                    .Ins(Mnemonic.CMovE, Rax, Rdx)
-                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
+                    .Ins(Mnemonic.CMovE, Rax, Rdx);
+                Push(Rax);
                 break;
 
             case Operation.Gt:
-                Pop(Rax);
-                _asm.Mov(Rdx, new Address(Rbx, Rcx, -1, 8))
-                    .Cmp(Rax, Rdx)
-                    .Mov(Rax, 0)
+                Pop(Rax, StackElementType.Number);
+                Pop(Rdx, StackElementType.Number);
+                _asm.Cmp(Rax, Rdx)
+                    .Mov(Rax, 0) // "xor rax, rax" would affect the status register
                     .Mov(Rdx, -1)
-                    .Ins(Mnemonic.CMovL, Rax, Rdx)
-                    .Mov(new Address(Rbx, Rcx, -1, 8), Rax);
+                    .Ins(Mnemonic.CMovL, Rax, Rdx);
+                Push(Rax);
                 break;
 
             // Control Flow and Lambdas
 
             case Operation.Lambda:
                 _asm.Lea(Rax, GetLabel(program, argument));
-                Push(Rax);
+                Push(Rax, StackElementType.Lambda);
                 break;
 
             case Operation.Ret:
@@ -326,14 +379,14 @@ public class Compiler : ICompiler
                 break;
 
             case Operation.Execute:
-                Pop(Rax);
+                Pop(Rax, StackElementType.Lambda);
                 _asm.Ins(Mnemonic.Call, Rax);
                 break;
 
             case Operation.ConditionalExecute:
                 var label = GenerateNewLabel();
-                Pop(Rax); // body
-                Pop(Rdx); // condition
+                Pop(Rax, StackElementType.Lambda); // body
+                Pop(Rdx, StackElementType.Number); // condition
                 _asm.Cmp(Rdx, 0)
                     .Jz(label)
                     .Ins(Mnemonic.Call, Rax)
@@ -341,9 +394,9 @@ public class Compiler : ICompiler
                 break;
 
             case Operation.WhileInit:
-                Pop(Rax); // body
+                Pop(Rax, StackElementType.Lambda); // body
                 _asm.Ins(Mnemonic.Push, Rax);
-                Pop(Rax); // condition
+                Pop(Rax, StackElementType.Lambda); // condition
                 _asm.Ins(Mnemonic.Push, Rax);
                 var loop = GenerateNewLabel();
                 var condition = GenerateNewLabel();
@@ -354,7 +407,7 @@ public class Compiler : ICompiler
                     .Lbl(condition)
                     .Mov(Rax, new Address(Rsp))
                     .Ins(Mnemonic.Call, Rax);
-                Pop(Rax);
+                Pop(Rax, StackElementType.Number);
                 _asm.Cmp(Rax, 0)
                     .Jne(loop)
                     .Add(Rsp, 16);
@@ -364,21 +417,35 @@ public class Compiler : ICompiler
 
             case Operation.Ref:
                 _asm.Mov(Rax, argument);
-                Push(Rax);
+                Push(Rax, StackElementType.Reference);
                 break;
 
             case Operation.Store:
-                Pop(Rax);
+                Pop(Rax, StackElementType.Reference);
                 Pop(Rdx);
-                _asm.Lea(Rbx, "references")
+                _asm.And(Rax, 0b11111)
+                    .Lea(Rbx, "references")
                     .Mov(new Address(Rbx, Rax, Stride: 8), Rdx);
+                if (_config.TypeSafety is not TypeSafety.None)
+                {
+                    _asm.Lea(Rbx, "type_references")
+                        .Mov(new Address(Rbx, Rax), R15B);
+                }
+
                 break;
 
             case Operation.Load:
-                Peek(Rax);
-                _asm.Lea(Rbx, "references")
+                Pop(Rax, StackElementType.Reference);
+                _asm.And(Rax, 0b11111)
+                    .Lea(Rbx, "references")
                     .Mov(Rdx, new Address(Rbx, Rax, Stride: 8));
-                Replace(Rdx);
+                if (_config.TypeSafety is not TypeSafety.None)
+                {
+                    _asm.Lea(Rbx, "type_references")
+                        .Mov(R15B, new Address(Rbx, Rax));
+                }
+
+                Push(Rdx);
                 break;
 
             // I/O
@@ -388,12 +455,12 @@ public class Compiler : ICompiler
                 break;
 
             case Operation.OutputChar:
-                Pop(Rdi);
+                Pop(Rdi, StackElementType.Number);
                 _asm.Cll("print_character");
                 break;
 
             case Operation.OutputDecimal:
-                Pop(Rdi);
+                Pop(Rdi, StackElementType.Number);
                 _asm.Cll("print_decimal");
                 break;
 
@@ -498,6 +565,23 @@ public class Compiler : ICompiler
             .Ins(Mnemonic.Ret);
     }
 
+    private void WritePrintString()
+    {
+        _asm.Str()
+            .Com("Prints a string. fd in rdi, ptr in rsi, len in rdx.")
+            .Lbl("print_string")
+            .Ins(Mnemonic.Push, Rdi)
+            .Ins(Mnemonic.Push, Rsi)
+            .Ins(Mnemonic.Push, Rdx)
+            .Cll("flush_stdout")
+            .Ins(Mnemonic.Pop, Rdx)
+            .Ins(Mnemonic.Pop, Rsi)
+            .Ins(Mnemonic.Pop, Rdi)
+            .Mov(Rax, "SYS_WRITE")
+            .Syscall()
+            .Ins(Mnemonic.Ret);
+    }
+
     private void WriteFlushStdout()
     {
         _asm.Str()
@@ -528,9 +612,7 @@ public class Compiler : ICompiler
 
     private void PrintString(string strLabel, string lenLabel, int fd = 1)
     {
-        _asm.Ins(Mnemonic.Push, Rdi)
-            .Cll("flush_stdout")
-            .Ins(Mnemonic.Pop, Rdi)
+        _asm.Cll("flush_stdout")
             .Mov(Rax, "SYS_WRITE")
             .Mov(Rdi, fd) // stdout
             .Lea(Rsi, strLabel)
@@ -550,22 +632,53 @@ public class Compiler : ICompiler
             .Syscall();
     }
 
-    private void Push(IOperand register)
+    private void Push(Register register, StackElementType? type = default)
     {
         _asm.Mov(Rbx, new LabelAddress("stack"))
             .Mov(Rcx, new LabelAddress("stack_ptr"))
-            .Mov(new Address(Rbx, Rcx, Stride: 8), register)
-            .Inc(Rcx)
+            .Mov(new Address(Rbx, Rcx, Stride: 8), register);
+        if (_config.TypeSafety is not TypeSafety.None)
+        {
+            _asm.Mov(R14, new LabelAddress("type_stack"));
+            if (type is not null)
+                _asm.Mov(R15B, (long)type);
+            _asm.Mov(new Address(R14, Rcx, Stride: 1), R15B);
+        }
+
+        _asm.Inc(Rcx)
             .Mov(new LabelAddress("stack_ptr"), Rcx);
     }
 
-    private void Pop(IOperand register)
+    private void Pop(Register register)
     {
         _asm.Mov(Rbx, new LabelAddress("stack"))
             .Mov(Rcx, new LabelAddress("stack_ptr"))
             .Dec(Rcx)
-            .Mov(register, new Address(Rbx, Rcx, Stride: 8))
-            .Mov(new LabelAddress("stack_ptr"), Rcx);
+            .Mov(new LabelAddress("stack_ptr"), Rcx)
+            .Mov(register, new Address(Rbx, Rcx, Stride: 8));
+
+        if (_config.TypeSafety is not TypeSafety.None)
+        {
+            _asm.Mov(R14, new LabelAddress("type_stack"))
+                .Mov(R15B, new Address(R14, Rcx, Stride: 1));
+        }
+    }
+
+    private void Pop(Register register, StackElementType type)
+    {
+        Pop(register);
+        if (_config.TypeSafety is TypeSafety.None ||
+            _config.TypeSafety is TypeSafety.Lambda && type is not StackElementType.Lambda)
+            return;
+        var label = GenerateNewLabel();
+        _asm.Cmp(R15B, (long)type)
+            .Je(label)
+            .Mov(Rdi, 2) // stderr
+            .Lea(Rsi, $"err_msg_pop_{type}".ToLower())
+            .Mov(Rdx, $"err_msg_pop_{type}_len".ToLower())
+            .Cll("print_string");
+        Exit(1);
+        _asm.Lbl(label);
     }
 
     private void Drop()
@@ -573,20 +686,6 @@ public class Compiler : ICompiler
         _asm.Mov(Rcx, new LabelAddress("stack_ptr"))
             .Dec(Rcx)
             .Mov(new LabelAddress("stack_ptr"), Rcx);
-    }
-
-    private void Replace(IOperand register)
-    {
-        _asm.Mov(Rbx, new LabelAddress("stack"))
-            .Mov(Rcx, new LabelAddress("stack_ptr"))
-            .Mov(new Address(Rbx, Rcx, -1, 8), register);
-    }
-
-    private void Peek(IOperand register)
-    {
-        _asm.Mov(Rbx, new LabelAddress("stack"))
-            .Mov(Rcx, new LabelAddress("stack_ptr"))
-            .Mov(register, new Address(Rbx, Rcx, -1, 8));
     }
 
     /*****************************************\
@@ -600,8 +699,11 @@ public class Compiler : ICompiler
         _asm.Com("Uninitialized Globals:")
             .Sec(ESection.Bss)
             .Str("references: RESQ 32")
-            .Str("stack: RESQ 1")
-            .Str("string_buffer: RESB 32")
+            .Str("type_references: RESB 32")
+            .Str("stack: RESQ 1");
+        if (_config.TypeSafety is not TypeSafety.None)
+            _asm.Str("type_stack: RESQ 1");
+        _asm.Str("string_buffer: RESB 32")
             .Str($"stdout_buffer: RESB {_config.StdoutBufferSize}");
     }
 
