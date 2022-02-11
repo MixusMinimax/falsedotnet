@@ -10,33 +10,55 @@ public class Interpreter : IInterpreter
 {
     private readonly ILogger _logger;
     private readonly Stack<long> _stack = new();
+    private readonly Stack<StackElementType> _types = new();
     private readonly long[] _variables = new long[32];
+    private readonly StackElementType[] _varTypes = new StackElementType[32];
 
     public Interpreter(ILogger logger)
     {
         _logger = logger;
     }
 
-    private void Push(long value)
+    private void Push(long value, StackElementType type = StackElementType.Number)
     {
+        if (type is StackElementType.Any)
+            throw new InterpreterException($"Can not push type {type} on the stack!");
         _stack.Push(value);
+        _types.Push(type);
+    }
+
+    private void Push((long Value, StackElementType Type) element)
+    {
+        var (value, type) = element;
+        _stack.Push(value);
+        _types.Push(type);
     }
 
     private void Push(bool value)
     {
-        _stack.Push(value ? -1 : 0);
+        Push(value ? -1 : 0);
     }
 
-    private long Peek() => _stack.Peek();
-
-    private long Pop()
+    private (long Value, StackElementType Type) Peek(StackElementType type = StackElementType.Any)
     {
         if (_stack.Count == 0)
             throw new InterpreterException("Tried to pop from empty stack!");
-        return _stack.Pop();
+        if (type is not StackElementType.Any && _types.Peek() != type)
+            throw new InterpreterException($"Tried to pop {type} from stack, but top was {_types.Peek()}!");
+        return (_stack.Peek(), _types.Peek());
     }
 
-    public void Interpret(Program program, bool printOperations = true)
+    private (long Value, StackElementType Type) Pop(StackElementType type = StackElementType.Any)
+    {
+        if (_stack.Count == 0)
+            throw new InterpreterException("Tried to pop from empty stack!");
+        var actual = _types.Pop();
+        if (type is not StackElementType.Any && actual != type)
+            throw new InterpreterException($"Tried to pop {type} from stack, but top was {actual}!");
+        return (_stack.Pop(), actual);
+    }
+
+    public void Interpret(Program program, bool printOperations = false)
     {
         var (entryId, functions, strings) = program;
         var currentCommands = functions[entryId];
@@ -64,6 +86,7 @@ public class Interpreter : IInterpreter
             if (printOperations)
                 _logger.WriteLine(currentCommands[pc].ToString().Pastel(Color.FromArgb(255, 120, 120, 120)));
             long a, b;
+            StackElementType ta, tb;
             long offset, condition;
             long lambdaId, body;
             switch (operation)
@@ -85,81 +108,81 @@ public class Interpreter : IInterpreter
                     break;
 
                 case Operation.Swap:
-                    (a, b) = (Pop(), Pop());
-                    Push(a);
-                    Push(b);
+                    ((a, ta), (b, tb)) = (Pop(), Pop());
+                    Push(a, ta);
+                    Push(b, tb);
                     break;
 
                 case Operation.Rot:
-                    (var c, b, a) = (Pop(), Pop(), Pop());
-                    Push(b);
-                    Push(c);
-                    Push(a);
+                    (var (c, tc), (b, tb), (a, ta)) = (Pop(), Pop(), Pop());
+                    Push(b, tb);
+                    Push(c, tc);
+                    Push(a, ta);
                     break;
 
                 case Operation.Pick:
-                    a = Pop();
-                    Push(_stack.ElementAt((int)a));
+                    a = Pop(StackElementType.Number).Value;
+                    Push(_stack.ElementAt((int)a), _types.ElementAt((int)a));
                     break;
 
                 // Arithmetic
 
                 case Operation.Add:
-                    (a, b) = (Pop(), Pop());
+                    (a, b) = (Pop(StackElementType.Number).Value, Pop(StackElementType.Number).Value);
                     Push(a + b);
                     break;
 
                 case Operation.Sub:
-                    (a, b) = (Pop(), Pop());
+                    (a, b) = (Pop(StackElementType.Number).Value, Pop(StackElementType.Number).Value);
                     Push(b - a);
                     break;
 
                 case Operation.Mul:
-                    (a, b) = (Pop(), Pop());
+                    (a, b) = (Pop(StackElementType.Number).Value, Pop(StackElementType.Number).Value);
                     Push(a * b);
                     break;
 
                 case Operation.Div:
-                    (a, b) = (Pop(), Pop());
+                    (a, b) = (Pop(StackElementType.Number).Value, Pop(StackElementType.Number).Value);
                     Push(b / a);
                     break;
 
                 case Operation.Neg:
-                    a = Pop();
+                    a = Pop(StackElementType.Number).Value;
                     Push(-a);
                     break;
 
                 case Operation.And:
-                    (a, b) = (Pop(), Pop());
+                    (a, b) = (Pop(StackElementType.Number).Value, Pop(StackElementType.Number).Value);
                     Push(a & b);
                     break;
 
                 case Operation.Or:
-                    (a, b) = (Pop(), Pop());
+                    (a, b) = (Pop(StackElementType.Number).Value, Pop(StackElementType.Number).Value);
                     Push(a | b);
                     break;
 
                 case Operation.Not:
-                    a = Pop();
+                    a = Pop(StackElementType.Number).Value;
                     Push(~a);
                     break;
 
                 // Comparison
 
                 case Operation.Gt:
-                    (a, b) = (Pop(), Pop());
+                    (a, b) = (Pop(StackElementType.Number).Value, Pop(StackElementType.Number).Value);
                     Push(a < b);
                     break;
 
                 case Operation.Eq:
-                    (a, b) = (Pop(), Pop());
+                    (a, b) = (Pop(StackElementType.Number).Value, Pop(StackElementType.Number).Value);
                     Push(a == b);
                     break;
 
                 // Control Flow and Lambdas
 
                 case Operation.Lambda:
-                    Push(argument);
+                    Push(argument, StackElementType.Lambda);
                     break;
 
                 case Operation.Ret:
@@ -171,29 +194,29 @@ public class Interpreter : IInterpreter
                     break;
 
                 case Operation.Execute:
-                    lambdaId = Pop();
+                    lambdaId = Pop(StackElementType.Lambda).Value;
                     ExecuteLambda(lambdaId, ref pc);
                     break;
 
                 case Operation.ConditionalExecute:
-                    (lambdaId, condition) = (Pop(), Pop());
+                    (lambdaId, condition) = (Pop(StackElementType.Lambda).Value, Pop(StackElementType.Number).Value);
                     if (condition != 0) ExecuteLambda(lambdaId, ref pc);
                     break;
 
                 case Operation.WhileInit:
                     // Pops the body and condition lambdas from the FALSE-stack and stores them on the callstack.
-                    (body, condition) = (Pop(), Pop());
+                    ((body, _), (condition, _)) = (Pop(StackElementType.Lambda), Pop(StackElementType.Lambda));
                     callStack.Push((0, condition));
                     callStack.Push((0, body));
                     break;
 
                 case Operation.WhileCondition:
-                    condition =  callStack.ElementAt(1).lambdaId;
+                    condition = callStack.ElementAt(1).lambdaId;
                     ExecuteLambda(condition, ref pc);
                     break;
 
                 case Operation.WhileBody:
-                    condition = Pop();
+                    (condition, _) = Pop(StackElementType.Number);
                     if (condition != 0)
                     {
                         body = callStack.Peek().lambdaId;
@@ -211,25 +234,26 @@ public class Interpreter : IInterpreter
                 case Operation.Exit:
                     // Not relevant for the interpreter.
                     // There is no character for inserting an exit command,
-                    // it's automatically inserted of the main function.
+                    // it's automatically inserted at the end of the main function.
                     // In the future, the exit code could be the top of the stack, or 0 if stack is empty.
                     return;
 
                 // Names
 
                 case Operation.Ref:
-                    Push(argument);
+                    Push(argument, StackElementType.Reference);
                     break;
 
                 case Operation.Store:
-                    offset = Pop() % _variables.Length;
-                    a = Pop();
+                    offset = Pop(StackElementType.Reference).Value % _variables.Length;
+                    (a, ta) = Pop();
                     _variables[offset] = a;
+                    _varTypes[offset] = ta;
                     break;
 
                 case Operation.Load:
-                    offset = Pop() % _variables.Length;
-                    Push(_variables[offset]);
+                    offset = Pop(StackElementType.Reference).Value % _variables.Length;
+                    Push(_variables[offset], _varTypes[offset]);
                     break;
 
                 // I/O
@@ -237,21 +261,21 @@ public class Interpreter : IInterpreter
                 case Operation.PrintString:
                     _logger.Write(strings[argument]);
                     break;
-                
+
                 case Operation.OutputChar:
-                    a = Pop();
+                    a = Pop(StackElementType.Number).Value;
                     _logger.Write((char)a);
                     break;
 
                 case Operation.OutputDecimal:
-                    a = Pop();
+                    a = Pop(StackElementType.Number).Value;
                     _logger.Write(a);
                     break;
 
                 case Operation.Flush:
                     (_logger as IFlushableLogger)?.Flush();
                     break;
-                
+
                 default:
                     throw new InterpreterException("Unreachable");
             }
