@@ -1,6 +1,4 @@
 ﻿using System.Drawing;
-using System.Reflection;
-using System.Text.RegularExpressions;
 using CommandLine;
 using FalseDotNet.Utility;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,7 +30,7 @@ public static class FindSubCommands
             select (
                 SubCommand: type,
                 Options: type
-                    .BaseType
+                    .BaseType!
                     .GetGenericArguments()[0]
             )
         ).ToDictionary(e => e.Options);

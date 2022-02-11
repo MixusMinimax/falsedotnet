@@ -9,24 +9,26 @@ namespace FalseDotNet.Compile;
 
 public class Compiler : ICompiler
 {
-    // @formatter:int_align_assignments true
-    private static readonly Register Rax = new Register(ERegister.ax, ERegisterSize.r);
-    private static readonly Register Rbx = new Register(ERegister.bx, ERegisterSize.r);
-    private static readonly Register Rcx = new Register(ERegister.cx, ERegisterSize.r);
-    private static readonly Register Rdx = new Register(ERegister.dx, ERegisterSize.r);
-    private static readonly Register Dx = new Register(ERegister.dx, ERegisterSize.w);
-    private static readonly Register Dl = new Register(ERegister.dx, ERegisterSize.l);
-    private static readonly Register Rdi = new Register(ERegister.di, ERegisterSize.r);
-    private static readonly Register Dil = new Register(ERegister.di, ERegisterSize.l);
-    private static readonly Register Rsi = new Register(ERegister.si, ERegisterSize.r);
-    private static readonly Register R8 = new Register(ERegister.r8, ERegisterSize.r);
-    private static readonly Register R8B = new Register(ERegister.r8, ERegisterSize.l);
-    private static readonly Register R9 = new Register(ERegister.r9, ERegisterSize.r);
-    private static readonly Register R9B = new Register(ERegister.r9, ERegisterSize.l);
-    private static readonly Register R10 = new Register(ERegister.r10, ERegisterSize.r);
-    private static readonly Register R11 = new Register(ERegister.r11, ERegisterSize.r);
-    private static readonly Register Rsp = new Register(ERegister.sp, ERegisterSize.r);
+    // @formatter:int_align_fields true
+    private static readonly Register Rax = new(ERegister.ax, ERegisterSize.r);
+    private static readonly Register Rbx = new(ERegister.bx, ERegisterSize.r);
+    private static readonly Register Rcx = new(ERegister.cx, ERegisterSize.r);
+    private static readonly Register Rdx = new(ERegister.dx, ERegisterSize.r);
+    private static readonly Register Dx  = new(ERegister.dx, ERegisterSize.w);
+    private static readonly Register Dl  = new(ERegister.dx, ERegisterSize.l);
+    private static readonly Register Rdi = new(ERegister.di, ERegisterSize.r);
+    private static readonly Register Dil = new(ERegister.di, ERegisterSize.l);
+    private static readonly Register Rsi = new(ERegister.si, ERegisterSize.r);
+    private static readonly Register R8  = new(ERegister.r8, ERegisterSize.r);
+    private static readonly Register R8B = new(ERegister.r8, ERegisterSize.l);
+    private static readonly Register R9  = new(ERegister.r9, ERegisterSize.r);
+    private static readonly Register R9B = new(ERegister.r9, ERegisterSize.l);
+    private static readonly Register R10 = new(ERegister.r10, ERegisterSize.r);
+    private static readonly Register R11 = new(ERegister.r11, ERegisterSize.r);
+    private static readonly Register Rsp = new(ERegister.sp, ERegisterSize.r);
+    // @formatter:int_align_fields restore
 
+    // @formatter:int_align_assignments true
     [SuppressMessage("ReSharper", "StringLiteralTypo")]
     private static readonly Dictionary<string, string> Macros = new()
     {
