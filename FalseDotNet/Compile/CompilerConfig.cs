@@ -3,7 +3,7 @@ using FalseDotNet.Utility;
 
 namespace FalseDotNet.Compile;
 
-public class CompilerConfig
+public record CompilerConfig
 {
     /// <summary>
     /// Names of the entrypoint labels. "main" is the standard gcc entrypoint.

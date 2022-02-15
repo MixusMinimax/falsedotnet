@@ -19,6 +19,15 @@ public class InterpretCommand : SubCommand<InterpretOptions>
         _codeParser = codeParser;
         _interpreter = interpreter;
     }
+    
+    private static InterpreterConfig MapOptionsToInterpreterConfig(InterpretOptions options)
+    {
+        return new InterpreterConfig
+        {
+            PrintOperations = options.PrintOperations,
+            TypeSafety = options.TypeSafety
+        };
+    }
 
     public override int Run(InterpretOptions opts)
     {
@@ -28,7 +37,7 @@ public class InterpretCommand : SubCommand<InterpretOptions>
             using var sr = new StreamReader(opts.InputPath);
             var code = sr.ReadToEnd();
             var parsedCode = _codeParser.Parse(code);
-            _interpreter.Interpret(parsedCode, opts.PrintOperations);
+            _interpreter.Interpret(parsedCode, MapOptionsToInterpreterConfig(opts));
         }
         catch (InterpreterException exception)
         {

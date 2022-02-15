@@ -27,7 +27,7 @@ public class CompileCommand : SubCommand<CompileOptions>
         _pathConverter = pathConverter;
     }
 
-    private CompilerConfig MapOptionsToCompilerConfig(CompileOptions options)
+    private static CompilerConfig MapOptionsToCompilerConfig(CompileOptions options)
     {
         return new CompilerConfig
         {

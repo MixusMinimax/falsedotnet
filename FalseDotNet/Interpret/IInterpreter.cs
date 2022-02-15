@@ -4,5 +4,5 @@ namespace FalseDotNet.Interpret;
 
 public interface IInterpreter
 {
-    public void Interpret(Program program, bool printOperations = true);
+    public void Interpret(Program program, InterpreterConfig config);
 }

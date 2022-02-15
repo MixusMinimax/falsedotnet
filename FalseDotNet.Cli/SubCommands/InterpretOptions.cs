@@ -1,4 +1,5 @@
 ﻿using CommandLine;
+using FalseDotNet.Utility;
 
 namespace FalseDotNet.Cli.SubCommands;
 
@@ -10,4 +11,11 @@ public class InterpretOptions
 
     [Option('p', "print-operations", Default = false, HelpText = "Print operations before executing them.")]
     public bool PrintOperations { get; set; }
+    
+    [Option('t', "type-safety", Default = TypeSafety.None, 
+        HelpText =
+            "What level of type safety to enforce.\n" +
+            "LAMBDA only enforces lambda execution, but allows integers to work as references, " +
+            "since they are masked anyway.")]
+    public TypeSafety TypeSafety { get; set; }
 }

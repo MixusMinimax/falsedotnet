@@ -13,6 +13,7 @@ public class Interpreter : IInterpreter
     private readonly Stack<StackElementType> _types = new();
     private readonly long[] _variables = new long[32];
     private readonly StackElementType[] _varTypes = new StackElementType[32];
+    private InterpreterConfig _config = null!;
 
     public Interpreter(ILogger logger)
     {
@@ -43,7 +44,10 @@ public class Interpreter : IInterpreter
     {
         if (_stack.Count == 0)
             throw new InterpreterException("Tried to pop from empty stack!");
-        if (type is not StackElementType.Any && _types.Peek() != type)
+        if (_config.TypeSafety is not TypeSafety.None &&
+            type is not StackElementType.Any &&
+            (_config.TypeSafety is not TypeSafety.Lambda || type is StackElementType.Lambda) &&
+            _types.Peek() != type)
             throw new InterpreterException($"Tried to pop {type} from stack, but top was {_types.Peek()}!");
         return (_stack.Peek(), _types.Peek());
     }
@@ -52,14 +56,17 @@ public class Interpreter : IInterpreter
     {
         if (_stack.Count == 0)
             throw new InterpreterException("Tried to pop from empty stack!");
-        var actual = _types.Pop();
-        if (type is not StackElementType.Any && actual != type)
-            throw new InterpreterException($"Tried to pop {type} from stack, but top was {actual}!");
-        return (_stack.Pop(), actual);
+        var ret = Peek(type);
+        _stack.Pop();
+        _types.Pop();
+        return ret;
     }
 
-    public void Interpret(Program program, bool printOperations = false)
+    public void Interpret(Program program, InterpreterConfig config)
     {
+        _config = config;
+        var printOperations = config.PrintOperations;
+
         var (entryId, functions, strings) = program;
         var currentCommands = functions[entryId];
         long currentLambdaId = 0;
