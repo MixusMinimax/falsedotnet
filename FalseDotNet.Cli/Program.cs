@@ -20,4 +20,10 @@ return new ServiceCollection()
     .AddTransient<ICompiler, Compiler>()
     .AddTransient<IOptimizer, Optimizer>()
     .BuildServiceProvider()
-    .ParseAndExecute(new Parser(with => with.CaseInsensitiveEnumValues = true), args, _ => 1);
+    .ParseAndExecute(new Parser(with =>
+    {
+        with.AutoHelp = Parser.Default.Settings.AutoHelp;
+        with.AutoVersion = Parser.Default.Settings.AutoVersion;
+        with.HelpWriter = Parser.Default.Settings.HelpWriter;
+        with.CaseInsensitiveEnumValues = true;
+    }), args, _ => 1);
