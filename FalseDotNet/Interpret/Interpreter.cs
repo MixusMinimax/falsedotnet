@@ -243,6 +243,7 @@ public class Interpreter : IInterpreter
                     // There is no character for inserting an exit command,
                     // it's automatically inserted at the end of the main function.
                     // In the future, the exit code could be the top of the stack, or 0 if stack is empty.
+                    (_logger as IFlushableLogger)?.Flush();
                     return;
 
                 // Names
