@@ -16,13 +16,15 @@ public class CompileCommand : SubCommand<CompileOptions>
     private readonly ICodeParser _codeParser;
     private readonly ICompiler _compiler;
     private readonly ILinuxExecutor _executor;
+    private readonly IPathConverter _pathConverter;
 
-    public CompileCommand(ILogger logger, ICodeParser codeParser, ICompiler compiler, ILinuxExecutor executor)
+    public CompileCommand(ILogger logger, ICodeParser codeParser, ICompiler compiler, ILinuxExecutor executor, IPathConverter pathConverter)
     {
         _logger = logger;
         _codeParser = codeParser;
         _compiler = compiler;
         _executor = executor;
+        _pathConverter = pathConverter;
     }
 
     private CompilerConfig MapOptionsToCompilerConfig(CompileOptions options)
@@ -76,14 +78,23 @@ public class CompileCommand : SubCommand<CompileOptions>
             return 1;
         }
 
-        if (options.Assemble)
+        if (options.Assemble || options.Link)
         {
+            if (OperatingSystem.IsWindows())
+            {
+                options.OutputPath = _pathConverter.ConvertToWsl(options.OutputPath);
+                objectPath = _pathConverter.ConvertToWsl(objectPath);
+            }
             _logger.WriteLine($"Assembling [{options.OutputPath}] into [{objectPath}].".Pastel(Color.Aqua));
             _executor.Assemble(options.OutputPath, objectPath);
         }
 
         if (options.Link)
         {
+            if (OperatingSystem.IsWindows())
+            {
+                binaryPath = _pathConverter.ConvertToWsl(binaryPath);
+            }
             _logger.WriteLine($"Linking [{objectPath}] into [{binaryPath}].".Pastel(Color.Aqua));
             _executor.Link(objectPath, binaryPath);
         }
