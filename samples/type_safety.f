@@ -13,7 +13,7 @@
   With full type safety, this is still forbidden, however. }
 [34m;!"Pop Int as Ref:       "35m;! 123 5:6f;+.          10,]b:
 
-{ Main code is 0, and there were a couple lambdas before this.
+{ Main function is 0, and there were a couple lambdas before this.
   This means, the ids should be 7 and 8.
   While not unsafe, this may yield ub in the case of the compiled code. }
 [34m;!"Pop Lambda as Int:    "35m;! ["asd"].", "["xyz"]. 10,]c:
