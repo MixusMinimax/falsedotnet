@@ -544,15 +544,19 @@ public class Compiler : ICompiler
             .Mov(Dx, new LabelAddress("stdout_len"))
             .Mov(new Address(Rsi, Rdx), Rdi)
             .Inc(Dx)
-            .Mov(new Register(ERegister.r8, ERegisterSize.l), 0)
-            .Mov(new Register(ERegister.r9, ERegisterSize.l), 0)
-            .Mov(new Register(ERegister.r9, ERegisterSize.l), -1)
+            .Mov(R8B, 0)
+            .Mov(R9B, 0)
+            .Mov(new Register(ERegister.r10, ERegisterSize.l), -1)
             .Cmp(Dx, _config.StdoutBufferSize)
-            .Ins(Mnemonic.CMovE, R8, R10)
-            .Cmp(Dil, 10) // flush on newlines
-            .Ins(Mnemonic.CMovE, R9, R10)
-            .Or(R8B, R9B)
-            .Cmp(R8B, 0)
+            .Ins(Mnemonic.CMovE, R8, R10);
+        if (_config.FlushOnNewline)
+        {
+            _asm.Cmp(Dil, 10) // flush on newlines
+                .Ins(Mnemonic.CMovE, R9, R10)
+                .Or(R8B, R9B);
+        }
+
+        _asm.Cmp(R8B, 0)
             .Jz("print_character_ret")
             .Mov(Rax, "SYS_WRITE")
             .Mov(Rdi, 1)
