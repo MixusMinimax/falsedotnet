@@ -39,6 +39,7 @@ public class Compiler : ICompiler
     [SuppressMessage("ReSharper", "StringLiteralTypo")]
     private static readonly Dictionary<string, string> Macros = new()
     {
+        ["SYS_READ"]      = "0",
         ["SYS_WRITE"]     = "1",
         ["SYS_EXIT"]      = "60",
         ["SYS_MMAP"]      = "9",
@@ -444,6 +445,29 @@ public class Compiler : ICompiler
                 break;
 
             // I/O
+
+            case Operation.ReadChar:
+                _asm.Mov(Rax, "SYS_READ")
+                    .Mov(Rdi, 0)
+                    .Zro(Rsi)
+                    .Mov(new Address(StackBase, StackCounter, Stride: 8), Rsi)
+                    .Lea(Rsi, new Address(StackBase, StackCounter, Stride: 8))
+                    .Mov(Rdx, 1)
+                    .Syscall();
+                if (_config.TypeSafety is not TypeSafety.None)
+                {
+                    _asm.Mov(CurType, (long)StackElementType.Number)
+                        .Mov(new Address(TypeStackBase, StackCounter), CurType);
+                }
+
+                var lbl = GenerateNewLabel();
+                _asm.Cmp(Rax, 0)
+                    .Jne(lbl)
+                    .Mov(Rax, -1)
+                    .Mov(new Address(StackBase, StackCounter, Stride: 8), Rax)
+                    .Lbl(lbl)
+                    .Inc(StackCounter);
+                break;
 
             case Operation.PrintString:
                 PrintString(argument);

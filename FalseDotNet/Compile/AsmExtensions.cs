@@ -21,6 +21,9 @@ public static class AsmExtensions
 
     public static Asm Lea(this Asm asm, Register destination, string label)
         => asm.Ins(Mnemonic.Lea, destination, new LabelAddress(label));
+    
+    public static Asm Lea(this Asm asm, Register destination, IOperand operand)
+        => asm.Ins(Mnemonic.Lea, destination, operand);
 
     public static Asm Mov(this Asm asm, IOperand destination, IOperand source)
         => asm.Ins(Mnemonic.Mov, destination, source);
