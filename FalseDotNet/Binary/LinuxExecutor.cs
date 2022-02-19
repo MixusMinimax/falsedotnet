@@ -7,9 +7,9 @@ namespace FalseDotNet.Binary;
 
 public interface ILinuxExecutor
 {
-    public void Execute(string fileName, string arguments);
-    public void Assemble(string inputPath, string outputPath);
-    public void Link(string inputPath, string outputPath);
+    public Task<int> ExecuteAsync(string fileName, string arguments);
+    public Task<int> AssembleAsync(string inputPath, string outputPath);
+    public Task<int> LinkAsync(string inputPath, string outputPath);
 }
 
 public class LinuxExecutor : ILinuxExecutor
@@ -21,7 +21,7 @@ public class LinuxExecutor : ILinuxExecutor
         _logger = logger;
     }
 
-    public void Execute(string fileName, string arguments)
+    public async Task<int> ExecuteAsync(string fileName, string arguments)
     {
         var startInfo = new ProcessStartInfo();
 
@@ -47,26 +47,48 @@ public class LinuxExecutor : ILinuxExecutor
         var process = new Process();
         process.StartInfo = startInfo;
         process.Start();
+        
+        if (OperatingSystem.IsWindows())
+            _logger.Write('\r');
 
-        var output = process.StandardOutput.ReadToEnd();
-        _logger.Write(output.Pastel(Color.Gold));
-        var err = process.StandardError.ReadToEnd();
-        _logger.Write(err.Pastel(Color.IndianRed));
+        await Task.WhenAll(((Func<Task>)(async () =>
+        {
+            string? s;
+            while ((s = await process.StandardOutput.ReadLineAsync()) is not null)
+            {
+                _logger.Write(s);
+                if (OperatingSystem.IsWindows())
+                    _logger.Write('\r');
+                _logger.Write('\n');
+            }
+        }))(), ((Func<Task>)(async () =>
+        {
+            string? s;
+            while ((s = await process.StandardError.ReadLineAsync()) is not null)
+            {
+                _logger.WriteLine(s.Pastel(Color.IndianRed));
+                if (OperatingSystem.IsWindows())
+                    _logger.Write('\r');
+                _logger.Write('\n');
+            }
+        }))());
 
-        process.WaitForExit();
+        await process.WaitForExitAsync();
         if (process.ExitCode != 0)
         {
             throw new Exception($"{fileName} failed! ExitCode: {process.ExitCode}");
         }
+
+        return process.ExitCode;
     }
 
-    public void Assemble(string inputPath, string outputPath)
+    public Task<int> AssembleAsync(string inputPath, string outputPath)
     {
-        Execute("nasm", $"-felf64 -o \"{outputPath}\" \"{inputPath}\"");
+        return ExecuteAsync("nasm", $"-felf64 -o \"{outputPath}\" \"{inputPath}\"");
     }
 
-    public void Link(string inputPath, string outputPath)
+    public Task<int> LinkAsync(string inputPath, string outputPath)
     {
-        Execute("ld", $"-o \"{outputPath}\" \"{inputPath}\"");
+        return ExecuteAsync("ld", $"-o \"{outputPath}\" \"{inputPath}\"");
     }
 }

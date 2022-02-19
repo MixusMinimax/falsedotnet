@@ -45,7 +45,7 @@ public class CompileCommand : SubCommand<CompileOptions>
         };
     }
 
-    public override int Run(CompileOptions options)
+    public override async Task<int> RunAsync(CompileOptions options)
     {
         if (string.IsNullOrWhiteSpace(options.OutputPath))
             options.OutputPath = Regex.Replace(options.InputPath, @"^(?:[^/\\]*[/\\])*(.*?)(?:\.+[^.]*)?$", "$1.asm");
@@ -78,7 +78,7 @@ public class CompileCommand : SubCommand<CompileOptions>
             return 1;
         }
 
-        if (options.Assemble || options.Link)
+        if (options.Assemble || options.Link || options.Run)
         {
             if (OperatingSystem.IsWindows())
             {
@@ -86,17 +86,23 @@ public class CompileCommand : SubCommand<CompileOptions>
                 objectPath = _pathConverter.ConvertToWsl(objectPath);
             }
             _logger.WriteLine($"Assembling [{options.OutputPath}] into [{objectPath}].".Pastel(Color.Aqua));
-            _executor.Assemble(options.OutputPath, objectPath);
+            await _executor.AssembleAsync(options.OutputPath, objectPath);
         }
 
-        if (options.Link)
+        if (options.Link || options.Run)
         {
             if (OperatingSystem.IsWindows())
             {
                 binaryPath = _pathConverter.ConvertToWsl(binaryPath);
             }
             _logger.WriteLine($"Linking [{objectPath}] into [{binaryPath}].".Pastel(Color.Aqua));
-            _executor.Link(objectPath, binaryPath);
+            await _executor.LinkAsync(objectPath, binaryPath);
+        }
+
+        if (options.Run)
+        {
+            _logger.WriteLine($"Running [{binaryPath}].".Pastel(Color.Aqua));
+            await _executor.ExecuteAsync(binaryPath, "");
         }
 
         _logger.WriteLine("Done!".Pastel(Color.Green));

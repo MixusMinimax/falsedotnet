@@ -18,6 +18,9 @@ public class CompileOptions
     [Option('l', "link", HelpText = "Link using ld.")]
     public bool Link { get; set; }
 
+    [Option('r', "run", HelpText = "Run after compilation.")]
+    public bool Run { get; set; }
+
     [Option('O', "optimization", HelpText = "Level of optimization: O0, O1, O2.")]
     public uint OptimizationLevel { get; set; }
 

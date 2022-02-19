@@ -1,18 +1,16 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-
-namespace FalseDotNet.Cli.SubCommandExtensions;
+﻿namespace FalseDotNet.Cli.SubCommandExtensions;
 
 public interface ISubCommand
 {
-    int Run(object opts);
+    Task<int> RunAsync(object opts);
 }
 
 public abstract class SubCommand<TOptions> : ISubCommand
 {
-    public int Run(object opts)
+    public Task<int> RunAsync(object opts)
     {
-        return Run((TOptions)opts);
+        return RunAsync((TOptions)opts);
     }
 
-    public abstract int Run(TOptions opts);
+    public abstract Task<int> RunAsync(TOptions opts);
 }

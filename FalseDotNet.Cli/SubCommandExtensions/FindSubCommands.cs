@@ -43,7 +43,7 @@ public static class FindSubCommands
         return services.AddSingleton(new SubCommandsDict(subCommands));
     }
 
-    public static int ParseAndExecute(this IServiceProvider services,
+    public static async Task<int> ParseAndExecute(this IServiceProvider services,
         Parser parser, IEnumerable<string> args, Func<IEnumerable<Error>, int> onError)
     {
         var subCommands = services.GetRequiredService<SubCommandsDict>().SubCommands;
@@ -54,7 +54,7 @@ public static class FindSubCommands
 
         var optionsType = parsed.Value.GetType();
         var commandType = subCommands[optionsType].SubCommand;
-        if (services.GetRequiredService(commandType) is ISubCommand command) return command.Run(parsed.Value);
+        if (services.GetRequiredService(commandType) is ISubCommand command) return await command.RunAsync(parsed.Value);
         services.GetRequiredService<ILogger>()
             .WriteLine($"Command [{commandType.Name}] not found!".Pastel(Color.IndianRed));
         return 1;

@@ -29,7 +29,7 @@ public class InterpretCommand : SubCommand<InterpretOptions>
         };
     }
 
-    public override int Run(InterpretOptions opts)
+    public override Task<int> RunAsync(InterpretOptions opts)
     {
         _logger.WriteLine($"Interpreting [{opts.InputPath}].".Pastel(Color.Aqua));
         try
@@ -47,9 +47,9 @@ public class InterpretCommand : SubCommand<InterpretOptions>
         {
             _logger.WriteLine($"Exception while reading [{opts.InputPath}]:".Pastel(Color.IndianRed));
             _logger.WriteLine(e.Message.Pastel(Color.IndianRed));
-            return 1;
+            return Task.FromResult(1);
         }
 
-        return 0;
+        return Task.FromResult(0);
     }
 }

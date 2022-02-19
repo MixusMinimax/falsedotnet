@@ -9,7 +9,7 @@ using FalseDotNet.Parse;
 using FalseDotNet.Utility;
 using Microsoft.Extensions.DependencyInjection;
 
-return new ServiceCollection()
+return await new ServiceCollection()
     .RegisterSubCommands(typeof(Program))
     .AddSingleton<ILogger, DefaultLogger>()
     .AddTransient<IIdGenerator, IncrementingIdGenerator>()
