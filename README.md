@@ -46,7 +46,8 @@ Copyright (C) 2022 FalseDotNet.Cli
   -p, --print-operations    (Default: false) Print operations before executing them.
 
   -t, --type-safety         (Default: None) What level of type safety to enforce.
-                            LAMBDA only enforces lambda execution, but allows integers to work as references, since they are masked anyway.
+                            LAMBDA only enforces lambda execution, but allows integers
+                            to work as references, since they are masked anyway.
 
   --help                    Display this help screen.
 
@@ -93,7 +94,8 @@ Copyright (C) 2022 FalseDotNet.Cli
   -O, --optimization        Level of optimization: O0, O1, O2.
 
   -t, --type-safety         (Default: None) What level of type safety to enforce.
-                            LAMBDA only enforces lambda execution, but allows integers to work as references, since they are masked anyway.
+                            LAMBDA only enforces lambda execution, but allows integers
+                            to work as references, since they are masked anyway.
 
   --help                    Display this help screen.
 

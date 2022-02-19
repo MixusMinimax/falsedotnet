@@ -24,10 +24,10 @@ public class CompileOptions
     [Option('O', "optimization", HelpText = "Level of optimization: O0, O1, O2.")]
     public uint OptimizationLevel { get; set; }
 
-    [Option('t', "type-safety", Default = TypeSafety.None, 
+    [Option('t', "type-safety", Default = TypeSafety.None,
         HelpText =
             "What level of type safety to enforce.\n" +
-            "LAMBDA only enforces lambda execution, but allows integers to work as references, " +
-            "since they are masked anyway.")]
+            "LAMBDA only enforces lambda execution, but allows integers\n" +
+            "to work as references, since they are masked anyway.")]
     public TypeSafety TypeSafety { get; set; }
 }
