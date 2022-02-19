@@ -4,5 +4,5 @@ namespace FalseDotNet.Interpret;
 
 public interface IInterpreter
 {
-    public void Interpret(Program program, InterpreterConfig config);
+    public void Interpret(Program program, InterpreterConfig config, TextReader? input = default);
 }

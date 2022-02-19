@@ -14,6 +14,7 @@ public class Interpreter : IInterpreter
     private readonly long[] _variables = new long[32];
     private readonly StackElementType[] _varTypes = new StackElementType[32];
     private InterpreterConfig _config = null!;
+    private TextReader _input = null!;
 
     public Interpreter(ILogger logger)
     {
@@ -62,9 +63,10 @@ public class Interpreter : IInterpreter
         return ret;
     }
 
-    public void Interpret(Program program, InterpreterConfig config)
+    public void Interpret(Program program, InterpreterConfig config, TextReader? input = null)
     {
         _config = config;
+        _input = input ?? Console.In;
         var printOperations = config.PrintOperations;
 
         var (entryId, functions, strings) = program;
@@ -265,6 +267,10 @@ public class Interpreter : IInterpreter
                     break;
 
                 // I/O
+
+                case Operation.ReadChar:
+                    Push(_input.Read());
+                    break;
 
                 case Operation.PrintString:
                     _logger.Write(strings[argument]);

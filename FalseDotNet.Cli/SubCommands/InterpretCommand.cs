@@ -35,9 +35,10 @@ public class InterpretCommand : SubCommand<InterpretOptions>
         try
         {
             using var sr = new StreamReader(opts.InputPath);
+            using var input = opts.StdinPath is not null ? new StreamReader(opts.StdinPath) : null;
             var code = sr.ReadToEnd();
             var parsedCode = _codeParser.Parse(code);
-            _interpreter.Interpret(parsedCode, MapOptionsToInterpreterConfig(opts));
+            _interpreter.Interpret(parsedCode, MapOptionsToInterpreterConfig(opts), input);
         }
         catch (InterpreterException exception)
         {

@@ -9,7 +9,10 @@ public class InterpretOptions
     [Value(0, MetaName = "PATH", Required = true, HelpText = "File containing FALSE code.")]
     public string InputPath { get; set; } = default!;
 
-    [Option('p', "print-operations", Default = false, HelpText = "Print operations before executing them.")]
+    [Option('i', "input", HelpText = "Read from file instead of stdin for program input.")]
+    public string? StdinPath { get; set; }
+
+    [Option('p', "print-operations", HelpText = "Print operations before executing them.")]
     public bool PrintOperations { get; set; }
     
     [Option('t', "type-safety", Default = TypeSafety.None,

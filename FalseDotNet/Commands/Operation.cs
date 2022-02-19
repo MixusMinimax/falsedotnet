@@ -47,6 +47,7 @@ public enum Operation
 
 // I/O
 
+    ReadChar,
     PrintString,
     OutputChar,
     OutputDecimal,

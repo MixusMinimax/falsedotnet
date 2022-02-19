@@ -130,6 +130,9 @@ public class CodeParser : ICodeParser
                 _strings[id] = str.ToString();
                 return new Command(Operation.PrintString, id);
             
+            case '^':
+                return Operation.ReadChar;
+            
             case '.':
                 return Operation.OutputDecimal;
 
