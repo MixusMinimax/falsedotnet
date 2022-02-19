@@ -9,6 +9,9 @@ public class CompileOptions
     [Value(0, MetaName = "PATH", Required = true, HelpText = "File containing FALSE code.")]
     public string InputPath { get; set; } = default!;
 
+    [Option('i', "input", HelpText = "Read from file instead of stdin for program input.")]
+    public string? StdinPath { get; set; }
+    
     [Option('o', "output", MetaValue = "PATH", HelpText = "File path to write assembly to. Defaults to '<input>.asm'.")]
     public string OutputPath { get; set; } = default!;
 

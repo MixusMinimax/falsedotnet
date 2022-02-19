@@ -18,7 +18,8 @@ public class CompileCommand : SubCommand<CompileOptions>
     private readonly ILinuxExecutor _executor;
     private readonly IPathConverter _pathConverter;
 
-    public CompileCommand(ILogger logger, ICodeParser codeParser, ICompiler compiler, ILinuxExecutor executor, IPathConverter pathConverter)
+    public CompileCommand(ILogger logger, ICodeParser codeParser, ICompiler compiler, ILinuxExecutor executor,
+        IPathConverter pathConverter)
     {
         _logger = logger;
         _codeParser = codeParser;
@@ -85,6 +86,7 @@ public class CompileCommand : SubCommand<CompileOptions>
                 options.OutputPath = _pathConverter.ConvertToWsl(options.OutputPath);
                 objectPath = _pathConverter.ConvertToWsl(objectPath);
             }
+
             _logger.WriteLine($"Assembling [{options.OutputPath}] into [{objectPath}].".Pastel(Color.Aqua));
             await _executor.AssembleAsync(options.OutputPath, objectPath);
         }
@@ -95,14 +97,18 @@ public class CompileCommand : SubCommand<CompileOptions>
             {
                 binaryPath = _pathConverter.ConvertToWsl(binaryPath);
             }
+
             _logger.WriteLine($"Linking [{objectPath}] into [{binaryPath}].".Pastel(Color.Aqua));
             await _executor.LinkAsync(objectPath, binaryPath);
         }
 
         if (options.Run)
         {
+            var input = Console.In;
+            if (options.StdinPath is not null)
+                input = new StreamReader(options.StdinPath);
             _logger.WriteLine($"Running [{binaryPath}].".Pastel(Color.Aqua));
-            await _executor.ExecuteAsync(binaryPath, "");
+            await _executor.ExecuteAsync(binaryPath, "", input);
         }
 
         _logger.WriteLine("Done!".Pastel(Color.Green));

@@ -7,7 +7,7 @@ namespace FalseDotNet.Binary;
 
 public interface ILinuxExecutor
 {
-    public Task<int> ExecuteAsync(string fileName, string arguments);
+    public Task<int> ExecuteAsync(string fileName, string arguments, TextReader? input = null);
     public Task<int> AssembleAsync(string inputPath, string outputPath);
     public Task<int> LinkAsync(string inputPath, string outputPath);
 }
@@ -21,7 +21,7 @@ public class LinuxExecutor : ILinuxExecutor
         _logger = logger;
     }
 
-    public async Task<int> ExecuteAsync(string fileName, string arguments)
+    public async Task<int> ExecuteAsync(string fileName, string arguments, TextReader? input = null)
     {
         var startInfo = new ProcessStartInfo();
 
@@ -43,11 +43,13 @@ public class LinuxExecutor : ILinuxExecutor
 
         startInfo.RedirectStandardOutput = true;
         startInfo.RedirectStandardError = true;
+        if (input is not null) startInfo.RedirectStandardInput = true;
         _logger.WriteLine($"Command: {startInfo.FileName} {startInfo.Arguments}".Pastel(Color.SlateGray));
         var process = new Process();
         process.StartInfo = startInfo;
         process.Start();
-        
+
+
         if (OperatingSystem.IsWindows())
             _logger.Write('\r');
 
@@ -71,9 +73,27 @@ public class LinuxExecutor : ILinuxExecutor
                     _logger.Write('\r');
                 _logger.Write('\n');
             }
-        }))());
+        }))(), ((Func<Task>)(async () =>
+        {
+            if (input is null) return;
+            var mem = new char[16];
+            var tokenFactory = new CancellationTokenSource();
+            process.Exited += (_, _) => tokenFactory.Cancel();
+            try
+            {
+                while (!process.HasExited)
+                {
+                    var res = await input.ReadAsync(mem, tokenFactory.Token);
+                    if (res is not 0)
+                        await process.StandardInput.WriteAsync(mem.AsMemory()[..res], tokenFactory.Token);
+                }
+            }
+            catch (Exception)
+            {
+                // ignored
+            }
+        }))(), process.WaitForExitAsync());
 
-        await process.WaitForExitAsync();
         if (process.ExitCode != 0)
         {
             throw new Exception($"{fileName} failed! ExitCode: {process.ExitCode}");
