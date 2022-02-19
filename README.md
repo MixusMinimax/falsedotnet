@@ -4,12 +4,7 @@ FALSE Interpreter and Compiler written in `.NET`. Compilation only works for Lin
 
 If you don't have `bash.exe`, you can also just create the assembly file.
 
-Both the interpreter and compiler have configurable type safety. There are three levels of safety: `{NONE, LAMBDA, FULL}`. Both `NONE` and `FULL` are self-explanatory, they either enforce types for stack elements or not.
-Arguably, it is most important to verify the type when executing a stack element as a lambda, which is the only thing the `LAMBDA` safety-level enforces. This is usually a good balance between safety and efficiency.
-
-It is important to keep in mind that references are masked to stay within `[0,32)`, so using an integer as a reference is not really a problem, which is why the `LAMBDA` safety is probably the appropriate level in most cases.
-
-When type-safety is not `NONE`, type information is maintained on a separate stack as to not mess up alignment of the main FALSE stack.
+Both the interpreter and compiler have configurable type safety. There are three levels of safety: `{NONE, LAMBDA, FULL}`.
 
 Read Wouter van Oortmerssen's (The creator of FALSE) website for more: [strlen.com/false-language](https://strlen.com/false-language/)
 
@@ -21,7 +16,7 @@ Also, the esolang wiki: [esolang.org/wiki/FALSE](https://esolangs.org/wiki/FALSE
 
 ```ps
 $ dotnet run help
-FalseDotNet.Cli 1.0.0
+FalseDotNet.Cli 0.0.5
 Copyright (C) 2022 FalseDotNet.Cli
 
   compile      compile FALSE code.
@@ -45,7 +40,7 @@ dotnet run interpret ..\samples\simple.f
 Usage:
 ```ps
 $ dotnet run help interpret
-FalseDotNet.Cli 1.0.0
+FalseDotNet.Cli 0.0.5
 Copyright (C) 2022 FalseDotNet.Cli
 
   -p, --print-operations    (Default: false) Print operations before executing them.
@@ -84,7 +79,7 @@ ld -o file file.o
 Usage:
 ```ps
 $ dotnet run help compile
-FalseDotNet.Cli 1.0.0
+FalseDotNet.Cli 0.0.5
 Copyright (C) 2022 FalseDotNet.Cli
 
   -o PATH, --output=PATH    File path to write assembly to. Defaults to '<input>.asm'.

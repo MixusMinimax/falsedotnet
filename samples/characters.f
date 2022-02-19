@@ -30,4 +30,6 @@
 
     Running .\bin\Release\net6.0\FalseDotNet.Cli.exe to interpret takes about 3.5s,
     so the assembled code is at least not slower than the interpreter.
+
+    After changing the stack pointer to not be stored in memory and loaded for every command, execution time changed from 0.44s to 0.07s. Wtf
 }
