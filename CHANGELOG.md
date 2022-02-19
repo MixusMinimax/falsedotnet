@@ -37,3 +37,9 @@ Instead, with this version, I use the registers `R12`-`R14` for these values and
 This has resulted in a 6.4x performance increase.
 
 With these new results, it might be necessary to improve stdout buffering to also buffer decimal representations.
+
+## 0.0.6
+
+Implement ReadChar command: `^`.
+
+Add `-i` argument to read input from a file instead of stdin, making testing easier. This works for both the interpreter and the compiler.

@@ -16,7 +16,7 @@ Also, the esolang wiki: [esolang.org/wiki/FALSE](https://esolangs.org/wiki/FALSE
 
 ```ps
 $ dotnet run help
-FalseDotNet.Cli 0.0.5
+FalseDotNet.Cli 0.0.6
 Copyright (C) 2022 FalseDotNet.Cli
 
   compile      compile FALSE code.
@@ -40,10 +40,12 @@ dotnet run interpret ..\samples\simple.f
 Usage:
 ```ps
 $ dotnet run help interpret
-FalseDotNet.Cli 0.0.5
+FalseDotNet.Cli 0.0.6
 Copyright (C) 2022 FalseDotNet.Cli
 
-  -p, --print-operations    (Default: false) Print operations before executing them.
+  -i, --input               Read from file instead of stdin for program input.
+
+  -p, --print-operations    Print operations before executing them.
 
   -t, --type-safety         (Default: None) What level of type safety to enforce.
                             LAMBDA only enforces lambda execution, but allows integers
@@ -80,8 +82,10 @@ ld -o file file.o
 Usage:
 ```ps
 $ dotnet run help compile
-FalseDotNet.Cli 0.0.5
+FalseDotNet.Cli 0.0.6
 Copyright (C) 2022 FalseDotNet.Cli
+
+  -i, --input               Read from file instead of stdin for program input.
 
   -o PATH, --output=PATH    File path to write assembly to. Defaults to '<input>.asm'.
 
