@@ -4,8 +4,12 @@ FALSE Interpreter and Compiler written in `.NET`. Compilation only works for Lin
 
 If you don't have `bash.exe`, you can also just create the assembly file.
 
-For now, this FALSE is not type-safe and doesn't do checks for variable access. This will be implemented by storing a value-type pair on the stack instead of just the value.
-The types could also be stored on a different stack, this way they can be just 1B each without messing up alignment (since values are 8B).
+Both the interpreter and compiler have configurable type safety. There are three levels of safety: `{NONE, LAMBDA, FULL}`. Both `NONE` and `FULL` are self-explanatory, they either enforce types for stack elements or not.
+Arguably, it is most important to verify the type when executing a stack element as a lambda, which is the only thing the `LAMBDA` safety-level enforces. This is usually a good balance between safety and efficiency.
+
+It is important to keep in mind that references are masked to stay within `[0,32)`, so using an integer as a reference is not really a problem, which is why the `LAMBDA` safety is probably the appropriate level in most cases.
+
+When type-safety is not `NONE`, type information is maintained on a separate stack as to not mess up alignment of the main FALSE stack.
 
 Read Wouter van Oortmerssen's (The creator of FALSE) website for more: [strlen.com/false-language](https://strlen.com/false-language/)
 
@@ -46,6 +50,9 @@ Copyright (C) 2022 FalseDotNet.Cli
 
   -p, --print-operations    (Default: false) Print operations before executing them.
 
+  -t, --type-safety         (Default: None) What level of type safety to enforce.
+                            LAMBDA only enforces lambda execution, but allows integers to work as references, since they are masked anyway.
+
   --help                    Display this help screen.
 
   --version                 Display version information.
@@ -85,6 +92,13 @@ Copyright (C) 2022 FalseDotNet.Cli
   -a, --assemble            Assemble using nasm.
 
   -l, --link                Link using ld.
+
+  -r, --run                 Run after compilation.
+
+  -O, --optimization        Level of optimization: O0, O1, O2.
+
+  -t, --type-safety         (Default: None) What level of type safety to enforce.
+                            LAMBDA only enforces lambda execution, but allows integers to work as references, since they are masked anyway.
 
   --help                    Display this help screen.
 
