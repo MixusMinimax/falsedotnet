@@ -10,25 +10,27 @@ namespace FalseDotNet.Compile;
 public class Compiler : ICompiler
 {
     // @formatter:int_align_fields true
-    private static readonly Register Rax  = new(ERegister.ax, ERegisterSize.r);
-    private static readonly Register Al   = new(ERegister.ax, ERegisterSize.l);
-    private static readonly Register Rbx  = new(ERegister.bx, ERegisterSize.r);
-    private static readonly Register Rcx  = new(ERegister.cx, ERegisterSize.r);
-    private static readonly Register Rdx  = new(ERegister.dx, ERegisterSize.r);
-    private static readonly Register Dx   = new(ERegister.dx, ERegisterSize.w);
-    private static readonly Register Dl   = new(ERegister.dx, ERegisterSize.l);
-    private static readonly Register Rdi  = new(ERegister.di, ERegisterSize.r);
-    private static readonly Register Dil  = new(ERegister.di, ERegisterSize.l);
-    private static readonly Register Rsi  = new(ERegister.si, ERegisterSize.r);
-    private static readonly Register Sil  = new(ERegister.si, ERegisterSize.l);
-    private static readonly Register R8   = new(ERegister.r8, ERegisterSize.r);
-    private static readonly Register R8B  = new(ERegister.r8, ERegisterSize.l);
-    private static readonly Register R9   = new(ERegister.r9, ERegisterSize.r);
-    private static readonly Register R9B  = new(ERegister.r9, ERegisterSize.l);
-    private static readonly Register R10  = new(ERegister.r10, ERegisterSize.r);
-    private static readonly Register R11  = new(ERegister.r11, ERegisterSize.r);
-    private static readonly Register R14  = new(ERegister.r14, ERegisterSize.r);
-    private static readonly Register R15B = new(ERegister.r15, ERegisterSize.l);
+    private static readonly Register Rax           = new(ERegister.ax, ERegisterSize.r);
+    private static readonly Register Al            = new(ERegister.ax, ERegisterSize.l);
+    private static readonly Register Rbx           = new(ERegister.bx, ERegisterSize.r);
+    private static readonly Register Rcx           = new(ERegister.cx, ERegisterSize.r);
+    private static readonly Register Rdx           = new(ERegister.dx, ERegisterSize.r);
+    private static readonly Register Dx            = new(ERegister.dx, ERegisterSize.w);
+    private static readonly Register Dl            = new(ERegister.dx, ERegisterSize.l);
+    private static readonly Register Rdi           = new(ERegister.di, ERegisterSize.r);
+    private static readonly Register Dil           = new(ERegister.di, ERegisterSize.l);
+    private static readonly Register Rsi           = new(ERegister.si, ERegisterSize.r);
+    private static readonly Register Sil           = new(ERegister.si, ERegisterSize.l);
+    private static readonly Register R8            = new(ERegister.r8, ERegisterSize.r);
+    private static readonly Register R8B           = new(ERegister.r8, ERegisterSize.l);
+    private static readonly Register R9            = new(ERegister.r9, ERegisterSize.r);
+    private static readonly Register R9B           = new(ERegister.r9, ERegisterSize.l);
+    private static readonly Register R10           = new(ERegister.r10, ERegisterSize.r);
+    private static readonly Register R11           = new(ERegister.r11, ERegisterSize.r);
+    private static readonly Register StackCounter  = new(ERegister.r12, ERegisterSize.r);
+    private static readonly Register StackBase     = new(ERegister.r13, ERegisterSize.r);
+    private static readonly Register TypeStackBase = new(ERegister.r14, ERegisterSize.r);
+    private static readonly Register CurType       = new(ERegister.r15, ERegisterSize.l);
 
     private static readonly Register Rsp = new(ERegister.sp, ERegisterSize.r);
     // @formatter:int_align_fields restore
@@ -166,14 +168,14 @@ public class Compiler : ICompiler
         _asm.Com("===[SETUP START]===")
             .Com("Allocate FALSE stack:", true);
         MMap(_config.StackSize);
-        _asm.Mov(new LabelAddress("stack"), Rax);
+        _asm.Mov(StackBase, Rax);
 
         if (_config.TypeSafety is not TypeSafety.None)
         {
             _asm.Str()
                 .Com("Allocate Type stack:", true);
             MMap(_config.StackSize / 8);
-            _asm.Mov(new LabelAddress("type_stack"), Rax);
+            _asm.Mov(TypeStackBase, Rax);
         }
 
         _asm.Com(@"===[SETUP  END]===")
@@ -231,54 +233,47 @@ public class Compiler : ICompiler
                 break;
 
             case Operation.Swap:
-                _asm.Mov(Rbx, new LabelAddress("stack"))
-                    .Mov(Rcx, new LabelAddress("stack_ptr"))
-                    .Mov(Rax, new Address(Rbx, Rcx, -1, 8))
-                    .Mov(Rdx, new Address(Rbx, Rcx, -2, 8))
-                    .Mov(new Address(Rbx, Rcx, -1, 8), Rdx)
-                    .Mov(new Address(Rbx, Rcx, -2, 8), Rax);
+                _asm.Mov(Rax, new Address(StackBase, StackCounter, -1, 8))
+                    .Mov(Rdx, new Address(StackBase, StackCounter, -2, 8))
+                    .Mov(new Address(StackBase, StackCounter, -1, 8), Rdx)
+                    .Mov(new Address(StackBase, StackCounter, -2, 8), Rax);
                 if (_config.TypeSafety is not TypeSafety.None)
                 {
-                    _asm.Mov(Rbx, new LabelAddress("type_stack"))
-                        .Mov(Al, new Address(Rbx, Rcx, -1))
-                        .Mov(Dl, new Address(Rbx, Rcx, -2))
-                        .Mov(new Address(Rbx, Rcx, -1), Dl)
-                        .Mov(new Address(Rbx, Rcx, -2), Al);
+                    _asm.Mov(Al, new Address(TypeStackBase, StackCounter, -1))
+                        .Mov(Dl, new Address(TypeStackBase, StackCounter, -2))
+                        .Mov(new Address(TypeStackBase, StackCounter, -1), Dl)
+                        .Mov(new Address(TypeStackBase, StackCounter, -2), Al);
                 }
 
                 break;
 
             case Operation.Rot:
-                _asm.Mov(Rbx, new LabelAddress("stack"))
-                    .Mov(Rcx, new LabelAddress("stack_ptr"))
-                    .Mov(Rax, new Address(Rbx, Rcx, -1, 8))
-                    .Mov(Rdx, new Address(Rbx, Rcx, -2, 8))
-                    .Mov(Rsi, new Address(Rbx, Rcx, -3, 8))
-                    .Mov(new Address(Rbx, Rcx, -1, 8), Rsi)
-                    .Mov(new Address(Rbx, Rcx, -2, 8), Rax)
-                    .Mov(new Address(Rbx, Rcx, -3, 8), Rdx);
+                _asm.Mov(Rax, new Address(StackBase, StackCounter, -1, 8))
+                    .Mov(Rdx, new Address(StackBase, StackCounter, -2, 8))
+                    .Mov(Rsi, new Address(StackBase, StackCounter, -3, 8))
+                    .Mov(new Address(StackBase, StackCounter, -1, 8), Rsi)
+                    .Mov(new Address(StackBase, StackCounter, -2, 8), Rax)
+                    .Mov(new Address(StackBase, StackCounter, -3, 8), Rdx);
                 if (_config.TypeSafety is not TypeSafety.None)
                 {
-                    _asm.Mov(Rbx, new LabelAddress("type_stack"))
-                        .Mov(Al, new Address(Rbx, Rcx, -1))
-                        .Mov(Dl, new Address(Rbx, Rcx, -2))
-                        .Mov(Sil, new Address(Rbx, Rcx, -3))
-                        .Mov(new Address(Rbx, Rcx, -1), Sil)
-                        .Mov(new Address(Rbx, Rcx, -2), Al)
-                        .Mov(new Address(Rbx, Rcx, -3), Dl);
+                    _asm.Mov(Al, new Address(TypeStackBase, StackCounter, -1))
+                        .Mov(Dl, new Address(TypeStackBase, StackCounter, -2))
+                        .Mov(Sil, new Address(TypeStackBase, StackCounter, -3))
+                        .Mov(new Address(TypeStackBase, StackCounter, -1), Sil)
+                        .Mov(new Address(TypeStackBase, StackCounter, -2), Al)
+                        .Mov(new Address(TypeStackBase, StackCounter, -3), Dl);
                 }
 
                 break;
 
             case Operation.Pick:
                 Pop(Rax, StackElementType.Number); // Offset
-                _asm.Mov(Rsi, Rcx)
+                _asm.Mov(Rsi, StackCounter)
                     .Sub(Rsi, Rax)
-                    .Mov(Rax, new Address(Rbx, Rsi, -1, 8));
+                    .Mov(Rax, new Address(StackBase, Rsi, -1, 8));
                 if (_config.TypeSafety is not TypeSafety.None)
                 {
-                    _asm.Mov(Rbx, new LabelAddress("type_stack"))
-                        .Mov(R15B, new Address(Rbx, Rsi, -1));
+                    _asm.Mov(CurType, new Address(TypeStackBase, Rsi, -1));
                 }
 
                 Push(Rax);
@@ -429,7 +424,7 @@ public class Compiler : ICompiler
                 if (_config.TypeSafety is not TypeSafety.None)
                 {
                     _asm.Lea(Rbx, "type_references")
-                        .Mov(new Address(Rbx, Rax), R15B);
+                        .Mov(new Address(Rbx, Rax), CurType);
                 }
 
                 break;
@@ -442,7 +437,7 @@ public class Compiler : ICompiler
                 if (_config.TypeSafety is not TypeSafety.None)
                 {
                     _asm.Lea(Rbx, "type_references")
-                        .Mov(R15B, new Address(Rbx, Rax));
+                        .Mov(CurType, new Address(Rbx, Rax));
                 }
 
                 Push(Rdx);
@@ -638,33 +633,25 @@ public class Compiler : ICompiler
 
     private void Push(Register register, StackElementType? type = default)
     {
-        _asm.Mov(Rbx, new LabelAddress("stack"))
-            .Mov(Rcx, new LabelAddress("stack_ptr"))
-            .Mov(new Address(Rbx, Rcx, Stride: 8), register);
+        _asm.Mov(new Address(StackBase, StackCounter, Stride: 8), register);
         if (_config.TypeSafety is not TypeSafety.None)
         {
-            _asm.Mov(R14, new LabelAddress("type_stack"));
             if (type is not null)
-                _asm.Mov(R15B, (long)type);
-            _asm.Mov(new Address(R14, Rcx, Stride: 1), R15B);
+                _asm.Mov(CurType, (long)type);
+            _asm.Mov(new Address(TypeStackBase, StackCounter, Stride: 1), CurType);
         }
 
-        _asm.Inc(Rcx)
-            .Mov(new LabelAddress("stack_ptr"), Rcx);
+        _asm.Inc(StackCounter);
     }
 
     private void Pop(Register register)
     {
-        _asm.Mov(Rbx, new LabelAddress("stack"))
-            .Mov(Rcx, new LabelAddress("stack_ptr"))
-            .Dec(Rcx)
-            .Mov(new LabelAddress("stack_ptr"), Rcx)
-            .Mov(register, new Address(Rbx, Rcx, Stride: 8));
+        _asm.Dec(StackCounter)
+            .Mov(register, new Address(StackBase, StackCounter, Stride: 8));
 
         if (_config.TypeSafety is not TypeSafety.None)
         {
-            _asm.Mov(R14, new LabelAddress("type_stack"))
-                .Mov(R15B, new Address(R14, Rcx, Stride: 1));
+            _asm.Mov(CurType, new Address(TypeStackBase, StackCounter, Stride: 1));
         }
     }
 
@@ -675,7 +662,7 @@ public class Compiler : ICompiler
             _config.TypeSafety is TypeSafety.Lambda && type is not StackElementType.Lambda)
             return;
         var label = GenerateNewLabel();
-        _asm.Cmp(R15B, (long)type)
+        _asm.Cmp(CurType, (long)type)
             .Je(label)
             .Mov(Rdi, 2) // stderr
             .Lea(Rsi, $"err_msg_pop_{type}".ToLower())
@@ -687,9 +674,7 @@ public class Compiler : ICompiler
 
     private void Drop()
     {
-        _asm.Mov(Rcx, new LabelAddress("stack_ptr"))
-            .Dec(Rcx)
-            .Mov(new LabelAddress("stack_ptr"), Rcx);
+        _asm.Dec(StackCounter);
     }
 
     /*****************************************\
@@ -704,10 +689,7 @@ public class Compiler : ICompiler
             .Sec(ESection.Bss)
             .Str("references: RESQ 32")
             .Str("type_references: RESB 32")
-            .Str("stack: RESQ 1");
-        if (_config.TypeSafety is not TypeSafety.None)
-            _asm.Str("type_stack: RESQ 1");
-        _asm.Str("string_buffer: RESB 32")
+            .Str("string_buffer: RESB 32")
             .Str($"stdout_buffer: RESB {_config.StdoutBufferSize}");
     }
 
@@ -715,7 +697,6 @@ public class Compiler : ICompiler
     {
         _asm.Com("Globals:")
             .Sec(ESection.Data)
-            .Str("stack_ptr: DQ 0")
             .Str("stdout_len: DW 0");
     }
 
