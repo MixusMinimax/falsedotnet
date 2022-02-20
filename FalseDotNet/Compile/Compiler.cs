@@ -510,10 +510,10 @@ public class Compiler : ICompiler
             // 1. take the absolute and remember if number was negative.
             .Mov(Rax, Rdi)
             .Neg(Rdi)
-            .Zro(R11)
+            .Zro(R10)
             .Mov(Rdx, -1)
             .Cmp(Rax, 0)
-            .Ins(Mnemonic.CMovL, R11, Rdx)
+            .Ins(Mnemonic.CMovL, R10, Rdx)
             .Ins(Mnemonic.CMovL, Rax, Rdi)
 
             // 2. Convert to decimal and store in string_buffer. (right to left)
@@ -532,11 +532,11 @@ public class Compiler : ICompiler
 
             // 3. Write '-' in front if number was negative.
             //    also, increment length counter
-            .Cmp(R11, 0)
+            .Cmp(R10, 0)
             .Je("print_decimal_skip")
             .Dec(Rcx)
-            .Mov(Dl, '-')
-            .Mov(new Address(R8, Rcx), Dl)
+            .Mov(R9B, '-')
+            .Mov(new Address(Rsi, Rcx), R9B)
             .Lbl("print_decimal_skip")
 
             // 4. Pass string_buffer+32-length as pointer, length to write syscall.

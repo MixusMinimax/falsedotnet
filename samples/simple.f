@@ -1,6 +1,5 @@
 { Print characters }
 
-
 "Hello, World! Number: ("29000 420/.")"10,
 10,
 "   34 + 35 = "34 35+.10,
