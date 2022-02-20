@@ -28,10 +28,12 @@ public record CompilerConfig
     /// <summary>
     /// The size of the buffer used for stdout buffering.
     /// </summary>
+    public long StdoutBufferSize { get; set; } = 256;
 
-    public long StdoutBufferSize { get; set; } = 64;
-
-    public bool FlushOnNewline { get; set; } = true;
+    /// <summary>
+    /// 
+    /// </summary>
+    public bool FlushOnNewline { get; set; } = false;
 
     public TypeSafety TypeSafety { get; set; } = TypeSafety.None;
 

@@ -102,6 +102,12 @@ public static class AsmExtensions
 
     public static Asm Jge(this Asm asm, string label)
         => asm.Ins(Mnemonic.Jge, new LabelOperand(label));
+    
+    public static Asm Jg(this Asm asm, string label)
+        => asm.Ins(Mnemonic.Jg, new LabelOperand(label));
+    
+    public static Asm Jl(this Asm asm, string label)
+        => asm.Ins(Mnemonic.Jl, new LabelOperand(label));
 
     public static Asm Jz(this Asm asm, string label)
         => asm.Ins(Mnemonic.Jz, new LabelOperand(label));

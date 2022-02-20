@@ -66,6 +66,7 @@ public class Compiler : ICompiler
     private readonly IOptimizer _optimizer;
     private CompilerConfig _config = null!;
     private Asm _asm = null!;
+    private Program _program = null!;
 
     public Compiler(ILogger logger, IIdGenerator idGenerator, IOptimizer optimizer)
     {
@@ -80,18 +81,19 @@ public class Compiler : ICompiler
 
         _config = config;
         _asm = new Asm();
+        _program = program;
 
         WriteHeader();
         _asm.Str();
         WriteConstants();
         _asm.Str();
-        WriteText(program);
+        WriteText();
         _asm.Str();
         WriteBss();
         _asm.Str();
         WriteData();
         _asm.Str();
-        WriteRoData(program);
+        WriteRoData();
 
         _optimizer.Optimize(_asm, config.OptimizerConfig);
 
@@ -125,16 +127,16 @@ public class Compiler : ICompiler
         }
     }
 
-    private void WriteText(Program program)
+    private void WriteText()
     {
         _asm.Com("Code:")
             .Sec(ESection.Text);
         foreach (var label in _config.StartLabels)
             _asm.Str($"    global {label}");
 
-        foreach (var id in program.Functions.Keys)
+        foreach (var id in _program.Functions.Keys)
         {
-            CompileLambda(program, id);
+            CompileLambda(_program, id);
         }
 
         WriteDecimalConverter();
@@ -470,7 +472,7 @@ public class Compiler : ICompiler
                 break;
 
             case Operation.PrintString:
-                PrintString(argument);
+                PrintStringById(argument);
                 break;
 
             case Operation.OutputChar:
@@ -502,11 +504,6 @@ public class Compiler : ICompiler
             .Com("Converts rdi to decimal and writes to stdout.")
             .Lbl("print_decimal")
 
-            // For now, flush stdout. In the future, this function will also write into the buffer.
-            .Ins(Mnemonic.Push, Rdi)
-            .Cll("flush_stdout")
-            .Ins(Mnemonic.Pop, Rdi)
-
             // rax: number, rsi: isNegative, rbx: string base, rcx: string index
             // rdx: modulo
 
@@ -522,14 +519,14 @@ public class Compiler : ICompiler
             // 2. Convert to decimal and store in string_buffer. (right to left)
             //    Count decimal places.
             .Mov(Rdi, 10)
-            .Lea(R8, "string_buffer")
+            .Lea(Rsi, "string_buffer")
             .Mov(Rcx, _config.StringBufferSize) // Start at the end
             .Lbl("print_decimal_loop")
             .Dec(Rcx)
             .Zro(Rdx)
             .Div(Rdi) // digit in rdi
             .Add(Dl, '0')
-            .Mov(new Address(R8, Rcx), Dl)
+            .Mov(new Address(Rsi, Rcx), Dl)
             .Cmp(Rax, 0)
             .Jne("print_decimal_loop")
 
@@ -543,13 +540,49 @@ public class Compiler : ICompiler
             .Lbl("print_decimal_skip")
 
             // 4. Pass string_buffer+32-length as pointer, length to write syscall.
-            .Add(R8, Rcx)
+            .Add(Rsi, Rcx)
             .Mov(Rdx, _config.StringBufferSize)
             .Sub(Rdx, Rcx)
+            .Cmp(Rdx, _config.StdoutBufferSize)
+            .Jl("print_decimal_skip_syscall")
+            .Ins(Mnemonic.Push, Rsi)
+            .Ins(Mnemonic.Push, Rdx)
+            .Cll("flush_stdout")
+            .Ins(Mnemonic.Pop, Rdx)
+            .Ins(Mnemonic.Pop, Rsi)
             .Mov(Rax, "SYS_WRITE")
             .Mov(Rdi, 1)
-            .Mov(Rsi, R8)
             .Syscall()
+            .Ins(Mnemonic.Ret)
+            .Lbl("print_decimal_skip_syscall")
+            
+            // rbx is number base
+            // rax is number length (first R8)
+            // rsi is stdout buffer
+            // rdx is stdout buffer length
+            
+            .Mov(Rbx, Rsi)
+            .Mov(R8, Rdx)
+            .Lea(Rsi, "stdout_buffer")
+            .Zro(Rdx)
+            .Mov(Dx, new LabelAddress("stdout_len"))
+            .Mov(Rax, _config.StdoutBufferSize)
+            .Sub(Rax, Rdx) // remaining space
+            .Cmp(Rax, R8)
+            .Jg("print_decimal_skip_flush")
+            .Cll("flush_stdout")
+            .Lbl("print_decimal_skip_flush")
+            .Add(Rsi, Rdx)
+            .Mov(Rax, R8)
+            .Zro(Rcx)
+            .Lbl("print_decimal_loop2")
+            .Mov(Dil, new Address(Rbx, Rcx))
+            .Mov(new Address(Rsi, Rcx), Dil)
+            .Inc(Rcx)
+            .Cmp(Rcx, Rax)
+            .Jne("print_decimal_loop2")
+            .Add(Rdx, Rax)
+            .Mov(new LabelAddress("stdout_len"), Dx)
             .Ins(Mnemonic.Ret);
     }
 
@@ -628,9 +661,56 @@ public class Compiler : ICompiler
      *            Common Patterns            *
      *****************************************/
 
-    private void PrintString(long id, int fd = 1)
+    private void PrintStringById(long id, int fd = 1)
     {
-        PrintString(GetStringLabel(id), GetStringLenLabel(id), fd);
+        var stringLabel = GetStringLabel(id);
+        var length = _program.Strings[id].Length;
+        if (length == 0)
+            return;
+        if (length >= _config.StdoutBufferSize)
+        {
+            // Call write syscall directly instead of buffering string
+            _asm.Cll("flush_stdout")
+                .Mov(Rax, "SYS_WRITE")
+                .Mov(Rdi, 1)
+                .Lea(Rsi, stringLabel)
+                .Mov(Rdx, length)
+                .Syscall();
+            return;
+        }
+
+        // if stdout buffer does not have space for string, flush.
+        var skipFlush = GenerateNewLabel();
+        _asm.Lea(Rsi, "stdout_buffer")
+            .Zro(Rdx)
+            .Mov(Dx, new LabelAddress("stdout_len"))
+            .Mov(Rax, _config.StdoutBufferSize)
+            .Sub(Rax, Rdx) // remaining space
+            .Cmp(Rax, length)
+            .Jg(skipFlush)
+            .Cll("flush_stdout")
+            .Lbl(skipFlush);
+
+        // copy string to buffer.
+        // rsi is stdout buffer + buffer length,
+        // rdx is stdout buffer length
+        // rbx is string buffer
+        // rax is string length
+        // rcx is counter
+        // dil is current character
+        var loop = GenerateNewLabel();
+        _asm.Lea(Rbx, stringLabel)
+            .Add(Rsi, Rdx)
+            .Zro(Rcx)
+            .Mov(Rax, length)
+            .Lbl(loop)
+            .Mov(Dil, new Address(Rbx, Rcx))
+            .Mov(new Address(Rsi, Rcx), Dil)
+            .Inc(Rcx)
+            .Cmp(Rcx, Rax)
+            .Jne(loop)
+            .Add(Rdx, Rax)
+            .Mov(new LabelAddress("stdout_len"), Dx);
     }
 
     private void PrintString(string strLabel, string lenLabel, int fd = 1)
@@ -650,7 +730,8 @@ public class Compiler : ICompiler
 
     private void Exit(IOperand exitCode)
     {
-        _asm.Mov(Rax, "SYS_EXIT")
+        _asm.Cll("flush_stdout")
+            .Mov(Rax, "SYS_EXIT")
             .Mov(Rdi, exitCode)
             .Syscall();
     }
@@ -724,11 +805,11 @@ public class Compiler : ICompiler
             .Str("stdout_len: DW 0");
     }
 
-    private void WriteRoData(Program program)
+    private void WriteRoData()
     {
         _asm.Com("Constants:")
             .Sec(ESection.RoData);
-        foreach (var entry in program.Strings)
+        foreach (var entry in _program.Strings)
         {
             var (key, value) = entry;
             _asm.Str($"{GetStringLabel(key)}: DB {value.Escape('`')}")
