@@ -31,10 +31,14 @@ public record CompilerConfig
     public long StdoutBufferSize { get; set; } = 256;
 
     /// <summary>
-    /// 
+    /// Automatically flush when \n is printed
     /// </summary>
-    public bool FlushOnNewline { get; set; } = false;
+    public bool FlushOnNewline { get; set; } = true;
 
+    /// <summary>
+    /// Which type safety level to use.
+    /// When no type safety is selected, type information is not maintained at run-time.
+    /// </summary>
     public TypeSafety TypeSafety { get; set; } = TypeSafety.None;
 
     public OptimizerConfig OptimizerConfig { get; set; } = new();

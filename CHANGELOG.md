@@ -43,3 +43,13 @@ With these new results, it might be necessary to improve stdout buffering to als
 Implement ReadChar command: `^`.
 
 Add `-i` argument to read input from a file instead of stdin, making testing easier. This works for both the interpreter and the compiler.
+
+## 0.0.7
+
+Buffer output from PrintString and PrintDecimal. If the printed string is longer than the buffer, the entire string is printed using the write syscall instead of copying it into the stdout buffer chunk by chunk. If the buffer is big enough but too full, the buffer is flushed before copying the string into the buffer.
+
+In addition, the buffer is flushed on program exit, just like with the interpreter. For some reason, this was missing until now.
+
+Stdin remains unbuffered, because we can't know how many characters to read in advance. It would be possible to analyze the program to know when to read input in chunks, i.e. the FALSE code `^^^` could just execute a single syscall. However, reading characters usually happens in loops, and in that case it would be way harder to predict how many characters to read.
+
+I personally don't really see a reason to bother, since the important parts of the language are pretty fast now.
