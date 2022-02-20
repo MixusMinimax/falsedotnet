@@ -53,3 +53,54 @@ In addition, the buffer is flushed on program exit, just like with the interpret
 Stdin remains unbuffered, because we can't know how many characters to read in advance. It would be possible to analyze the program to know when to read input in chunks, i.e. the FALSE code `^^^` could just execute a single syscall. However, reading characters usually happens in loops, and in that case it would be way harder to predict how many characters to read.
 
 I personally don't really see a reason to bother, since the important parts of the language are pretty fast now.
+
+## 0.0.8
+
+Consequent Pops and Pushes are replaced with Peek/Replace.
+
+Example:
+
+```asm
+; Add top two numbers on the stack
+
+; Before
+; pop, pop, add, push
+dec r12
+mov rax, [r13+r12*8]
+dec r12
+mov rdx, [r13+r12*8]
+add rax, rdx
+mov [r13+r12*8], rax
+inc r12
+
+; After
+; pop, peek, add, replace
+dec r12
+mov rax, [r13+r12*8]
+mov rdx, [r13+(r12+-1)*8]
+add rax, rdx
+mov [r13+(r12+-1)*8], rax
+```
+
+This is especially interesting in the dup command `$`:
+
+```asm
+; Duplicate top stack element
+
+; Before
+; pop, push, push
+dec r12
+mov rax, [r13+r12*8]
+mov [r13+r12*8], rax
+inc r12
+mov [r13+r12*8], rax
+inc r12
+
+; After
+; peek, push
+mov rax, [r13+(r12+-1)*8]
+mov [r13+r12*8], rax
+inc r12
+```
+
+This results in an amortized user-space improvement of about 7%-10% in the output.f example.

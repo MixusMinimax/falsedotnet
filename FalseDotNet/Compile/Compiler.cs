@@ -26,7 +26,6 @@ public class Compiler : ICompiler
     private static readonly Register R9            = new(ERegister.r9, ERegisterSize.r);
     private static readonly Register R9B           = new(ERegister.r9, ERegisterSize.l);
     private static readonly Register R10           = new(ERegister.r10, ERegisterSize.r);
-    private static readonly Register R11           = new(ERegister.r11, ERegisterSize.r);
     private static readonly Register StackCounter  = new(ERegister.r12, ERegisterSize.r);
     private static readonly Register StackBase     = new(ERegister.r13, ERegisterSize.r);
     private static readonly Register TypeStackBase = new(ERegister.r14, ERegisterSize.r);
@@ -226,8 +225,7 @@ public class Compiler : ICompiler
             // Stack
 
             case Operation.Dup:
-                Pop(Rax);
-                Push(Rax);
+                Peek(Rax);
                 Push(Rax);
                 break;
 
@@ -270,99 +268,99 @@ public class Compiler : ICompiler
                 break;
 
             case Operation.Pick:
-                Pop(Rax, StackElementType.Number); // Offset
+                Peek(Rax, StackElementType.Number); // Offset
                 _asm.Mov(Rsi, StackCounter)
                     .Sub(Rsi, Rax)
-                    .Mov(Rax, new Address(StackBase, Rsi, -1, 8));
+                    .Mov(Rax, new Address(StackBase, Rsi, -2, 8));
                 if (_config.TypeSafety is not TypeSafety.None)
                 {
-                    _asm.Mov(CurType, new Address(TypeStackBase, Rsi, -1));
+                    _asm.Mov(CurType, new Address(TypeStackBase, Rsi, -2));
                 }
 
-                Push(Rax);
+                Replace(Rax);
                 break;
 
             // Arithmetic
 
             case Operation.Add:
                 Pop(Rax, StackElementType.Number);
-                Pop(Rdx, StackElementType.Number);
+                Peek(Rdx, StackElementType.Number);
                 _asm.Add(Rax, Rdx);
-                Push(Rax, StackElementType.Number);
+                Replace(Rax, StackElementType.Number);
                 break;
 
             case Operation.Sub:
                 Pop(Rax, StackElementType.Number);
-                Pop(Rdx, StackElementType.Number);
+                Peek(Rdx, StackElementType.Number);
                 _asm.Sub(Rdx, Rax);
-                Push(Rdx, StackElementType.Number);
+                Replace(Rdx, StackElementType.Number);
                 break;
 
             case Operation.Mul:
                 Pop(Rax, StackElementType.Number);
-                Pop(Rdx, StackElementType.Number);
+                Peek(Rdx, StackElementType.Number);
                 _asm.Mul(Rax, Rdx);
-                Push(Rax, StackElementType.Number);
+                Replace(Rax, StackElementType.Number);
                 break;
 
             case Operation.Div:
                 Pop(Rdi, StackElementType.Number);
-                Pop(Rax, StackElementType.Number);
+                Peek(Rax, StackElementType.Number);
                 _asm.Zro(Rdx)
                     .Mov(Rsi, Rdx)
                     .Not(Rsi)
                     .Cmp(Rax, 0)
                     .Ins(Mnemonic.CMovL, Rdx, Rsi)
                     .Div(Rdi);
-                Push(Rax, StackElementType.Number);
+                Replace(Rax, StackElementType.Number);
                 break;
 
             case Operation.Neg:
-                Pop(Rax, StackElementType.Number);
+                Peek(Rax, StackElementType.Number);
                 _asm.Neg(Rax);
-                Push(Rax, StackElementType.Number);
+                Replace(Rax, StackElementType.Number);
                 break;
 
             case Operation.And:
                 Pop(Rax, StackElementType.Number);
-                Pop(Rdx, StackElementType.Number);
+                Peek(Rdx, StackElementType.Number);
                 _asm.And(Rax, Rdx);
-                Push(Rax, StackElementType.Number);
+                Replace(Rax, StackElementType.Number);
                 break;
 
             case Operation.Or:
                 Pop(Rax, StackElementType.Number);
-                Pop(Rdx, StackElementType.Number);
+                Peek(Rdx, StackElementType.Number);
                 _asm.Or(Rax, Rdx);
-                Push(Rax, StackElementType.Number);
+                Replace(Rax, StackElementType.Number);
                 break;
 
             case Operation.Not:
-                Pop(Rax, StackElementType.Number);
+                Peek(Rax, StackElementType.Number);
                 _asm.Not(Rax);
-                Push(Rax, StackElementType.Number);
+                Replace(Rax, StackElementType.Number);
                 break;
 
             // Comparison
 
             case Operation.Eq:
                 Pop(Rax, StackElementType.Number);
-                Pop(Rdx, StackElementType.Number);
+                Peek(Rdx, StackElementType.Number);
                 _asm.Cmp(Rax, Rdx)
                     .Mov(Rax, 0) // "xor rax, rax" would affect the status register
                     .Mov(Rdx, -1)
                     .Ins(Mnemonic.CMovE, Rax, Rdx);
-                Push(Rax);
+                Replace(Rax);
                 break;
 
             case Operation.Gt:
                 Pop(Rax, StackElementType.Number);
-                Pop(Rdx, StackElementType.Number);
+                Peek(Rdx, StackElementType.Number);
                 _asm.Cmp(Rax, Rdx)
                     .Mov(Rax, 0) // "xor rax, rax" would affect the status register
                     .Mov(Rdx, -1)
                     .Ins(Mnemonic.CMovL, Rax, Rdx);
-                Push(Rax);
+                Replace(Rax);
                 break;
 
             // Control Flow and Lambdas
@@ -433,7 +431,7 @@ public class Compiler : ICompiler
                 break;
 
             case Operation.Load:
-                Pop(Rax, StackElementType.Reference);
+                Peek(Rax, StackElementType.Reference);
                 _asm.And(Rax, 0b11111)
                     .Lea(Rbx, "references")
                     .Mov(Rdx, new Address(Rbx, Rax, Stride: 8));
@@ -443,7 +441,7 @@ public class Compiler : ICompiler
                         .Mov(CurType, new Address(Rbx, Rax));
                 }
 
-                Push(Rdx);
+                Replace(Rdx);
                 break;
 
             // I/O
@@ -555,12 +553,11 @@ public class Compiler : ICompiler
             .Syscall()
             .Ins(Mnemonic.Ret)
             .Lbl("print_decimal_skip_syscall")
-            
+
             // rbx is number base
             // rax is number length (first R8)
             // rsi is stdout buffer
             // rdx is stdout buffer length
-            
             .Mov(Rbx, Rsi)
             .Mov(R8, Rdx)
             .Lea(Rsi, "stdout_buffer")
@@ -661,7 +658,7 @@ public class Compiler : ICompiler
      *            Common Patterns            *
      *****************************************/
 
-    private void PrintStringById(long id, int fd = 1)
+    private void PrintStringById(long id)
     {
         var stringLabel = GetStringLabel(id);
         var length = _program.Strings[id].Length;
@@ -749,6 +746,15 @@ public class Compiler : ICompiler
         _asm.Inc(StackCounter);
     }
 
+    private void Replace(Register register, StackElementType? type = default)
+    {
+        _asm.Mov(new Address(StackBase, StackCounter, -1, 8), register);
+        if (_config.TypeSafety is TypeSafety.None) return;
+        if (type is not null)
+            _asm.Mov(CurType, (long)type);
+        _asm.Mov(new Address(TypeStackBase, StackCounter, -1), CurType);
+    }
+
     private void Pop(Register register)
     {
         _asm.Dec(StackCounter)
@@ -760,9 +766,18 @@ public class Compiler : ICompiler
         }
     }
 
-    private void Pop(Register register, StackElementType type)
+    private void Peek(Register register)
     {
-        Pop(register);
+        _asm.Mov(register, new Address(StackBase, StackCounter, -1, 8));
+
+        if (_config.TypeSafety is not TypeSafety.None)
+        {
+            _asm.Mov(CurType, new Address(TypeStackBase, StackCounter, -1));
+        }
+    }
+
+    private void VerifyPopped(StackElementType type)
+    {
         if (_config.TypeSafety is TypeSafety.None ||
             _config.TypeSafety is TypeSafety.Lambda && type is not StackElementType.Lambda)
             return;
@@ -775,6 +790,18 @@ public class Compiler : ICompiler
             .Cll("print_string");
         Exit(1);
         _asm.Lbl(label);
+    }
+
+    private void Pop(Register register, StackElementType type)
+    {
+        Pop(register);
+        VerifyPopped(type);
+    }
+
+    private void Peek(Register register, StackElementType type)
+    {
+        Peek(register);
+        VerifyPopped(type);
     }
 
     private void Drop()

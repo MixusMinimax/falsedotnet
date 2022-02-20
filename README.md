@@ -16,7 +16,7 @@ Also, the esolang wiki: [esolang.org/wiki/FALSE](https://esolangs.org/wiki/FALSE
 
 ```ps
 $ dotnet run help
-FalseDotNet.Cli 0.0.7
+FalseDotNet.Cli 0.0.8
 Copyright (C) 2022 FalseDotNet.Cli
 
   compile      compile FALSE code.
@@ -40,7 +40,7 @@ dotnet run interpret ..\samples\simple.f
 Usage:
 ```ps
 $ dotnet run help interpret
-FalseDotNet.Cli 0.0.7
+FalseDotNet.Cli 0.0.8
 Copyright (C) 2022 FalseDotNet.Cli
 
   -i, --input               Read from file instead of stdin for program input.
@@ -82,7 +82,7 @@ ld -o file file.o
 Usage:
 ```ps
 $ dotnet run help compile
-FalseDotNet.Cli 0.0.7
+FalseDotNet.Cli 0.0.8
 Copyright (C) 2022 FalseDotNet.Cli
 
   -i, --input               Read from file instead of stdin for program input.

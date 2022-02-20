@@ -28,12 +28,12 @@ public record CompilerConfig
     /// <summary>
     /// The size of the buffer used for stdout buffering.
     /// </summary>
-    public long StdoutBufferSize { get; set; } = 256;
+    public long StdoutBufferSize { get; set; } = 8192;
 
     /// <summary>
     /// Automatically flush when \n is printed
     /// </summary>
-    public bool FlushOnNewline { get; set; } = true;
+    public bool FlushOnNewline { get; set; } = false;
 
     /// <summary>
     /// Which type safety level to use.
