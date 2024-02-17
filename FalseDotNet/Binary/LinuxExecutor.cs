@@ -8,19 +8,12 @@ namespace FalseDotNet.Binary;
 public interface ILinuxExecutor
 {
     public Task<int> ExecuteAsync(string fileName, string arguments, TextReader? input = null);
-    public Task<int> AssembleAsync(string inputPath, string outputPath);
-    public Task<int> LinkAsync(string inputPath, string outputPath);
+    public Task<int> AssembleAsync(FileInfo inputPath, FileInfo outputPath);
+    public Task<int> LinkAsync(FileInfo inputPath, FileInfo outputPath);
 }
 
-public class LinuxExecutor : ILinuxExecutor
+public class LinuxExecutor(ILogger logger) : ILinuxExecutor
 {
-    private readonly ILogger _logger;
-
-    public LinuxExecutor(ILogger logger)
-    {
-        _logger = logger;
-    }
-
     public async Task<int> ExecuteAsync(string fileName, string arguments, TextReader? input = null)
     {
         var startInfo = new ProcessStartInfo();
@@ -44,34 +37,34 @@ public class LinuxExecutor : ILinuxExecutor
         startInfo.RedirectStandardOutput = true;
         startInfo.RedirectStandardError = true;
         if (input is not null) startInfo.RedirectStandardInput = true;
-        _logger.WriteLine($"Command: {startInfo.FileName} {startInfo.Arguments}".Pastel(Color.SlateGray));
+        logger.WriteLine($"Command: {startInfo.FileName} {startInfo.Arguments}".Pastel(Color.SlateGray));
         var process = new Process();
         process.StartInfo = startInfo;
         process.Start();
 
 
         if (OperatingSystem.IsWindows())
-            _logger.Write('\r');
+            logger.Write('\r');
 
         await Task.WhenAll(((Func<Task>)(async () =>
         {
             string? s;
             while ((s = await process.StandardOutput.ReadLineAsync()) is not null)
             {
-                _logger.Write(s);
+                logger.Write(s);
                 if (OperatingSystem.IsWindows())
-                    _logger.Write('\r');
-                _logger.Write('\n');
+                    logger.Write('\r');
+                logger.Write('\n');
             }
         }))(), ((Func<Task>)(async () =>
         {
             string? s;
             while ((s = await process.StandardError.ReadLineAsync()) is not null)
             {
-                _logger.WriteLine(s.Pastel(Color.IndianRed));
+                logger.WriteLine(s.Pastel(Color.IndianRed));
                 if (OperatingSystem.IsWindows())
-                    _logger.Write('\r');
-                _logger.Write('\n');
+                    logger.Write('\r');
+                logger.Write('\n');
             }
         }))(), ((Func<Task>)(async () =>
         {
@@ -102,12 +95,12 @@ public class LinuxExecutor : ILinuxExecutor
         return process.ExitCode;
     }
 
-    public Task<int> AssembleAsync(string inputPath, string outputPath)
+    public Task<int> AssembleAsync(FileInfo inputPath, FileInfo outputPath)
     {
         return ExecuteAsync("nasm", $"-felf64 -o \"{outputPath}\" \"{inputPath}\"");
     }
 
-    public Task<int> LinkAsync(string inputPath, string outputPath)
+    public Task<int> LinkAsync(FileInfo inputPath, FileInfo outputPath)
     {
         return ExecuteAsync("ld", $"-o \"{outputPath}\" \"{inputPath}\"");
     }

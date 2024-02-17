@@ -4,15 +4,19 @@ namespace FalseDotNet.Binary;
 
 public interface IPathConverter
 {
-    public string ConvertToWsl(string path);
+    public FileInfo ConvertToWsl(FileInfo path);
 }
 
-public class PathConverter : IPathConverter
+public partial class PathConverter : IPathConverter
 {
-    public string ConvertToWsl(string path)
+    public FileInfo ConvertToWsl(FileInfo path)
     {
-        path = path.Replace('\\', '/');
-        path = Regex.Replace(path, @"^[A-Z]:", m => "/mnt/" + m.ToString()[..1].ToLower());
-        return path;
+        var stringPath = path.FullName;
+        stringPath = stringPath.Replace('\\', '/');
+        stringPath = PathRegex().Replace(stringPath, m => "/mnt/" + m.ToString()[..1].ToLower());
+        return new FileInfo(stringPath);
     }
+
+    [GeneratedRegex(@"^[A-Z]:")]
+    private static partial Regex PathRegex();
 }

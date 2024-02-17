@@ -1,36 +1,8 @@
 ﻿using System.CommandLine;
 using System.CommandLine.Parsing;
-using System.Drawing;
-using CommandLine;
-using FalseDotNet.Binary;
-using FalseDotNet.Cli;
-using FalseDotNet.Cli.SubCommandExtensions;
-using FalseDotNet.Compile;
+using FalseDotNet.Cli.SubCommands;
 using FalseDotNet.Compile.Optimization;
-using FalseDotNet.Interpret;
-using FalseDotNet.Parse;
 using FalseDotNet.Utility;
-using Microsoft.Extensions.DependencyInjection;
-using Pastel;
-
-// return await new ServiceCollection()
-//     .RegisterSubCommands(typeof(Program))
-//     .AddSingleton<ILogger, DefaultLogger>()
-//     .AddTransient<IIdGenerator, IncrementingIdGenerator>()
-//     .AddSingleton<IPathConverter, PathConverter>()
-//     .AddSingleton<ILinuxExecutor, LinuxExecutor>()
-//     .AddTransient<ICodeParser, CodeParser>()
-//     .AddTransient<IInterpreter, Interpreter>()
-//     .AddTransient<ICompiler, Compiler>()
-//     .AddTransient<IOptimizer, Optimizer>()
-//     .BuildServiceProvider()
-//     .ParseAndExecute(new Parser(with =>
-//     {
-//         with.AutoHelp = Parser.Default.Settings.AutoHelp;
-//         with.AutoVersion = Parser.Default.Settings.AutoVersion;
-//         with.HelpWriter = Parser.Default.Settings.HelpWriter;
-//         with.CaseInsensitiveEnumValues = true;
-//     }), args, _ => 1);
 
 namespace FalseDotNet.Cli;
 
@@ -59,7 +31,7 @@ public static class Program
         );
 
         // positional
-        var pathOption = new Argument<FileInfo>(
+        var pathArgument = new Argument<FileInfo>(
             name: "PATH",
             description: "File containing FALSE code.",
             parse: result => ParseFileInfo(result)!
@@ -70,54 +42,79 @@ public static class Program
             inputPathOption,
             typeSafetyOption,
             printOperationsOption,
-            pathOption
+            pathArgument
         };
-        runCommand.SetHandler(
-            (inputPath, typeSafety, printOperations, path) =>
-            {
-                var services = new ServiceCollection()
-                    .AddSingleton<ILogger, DefaultLogger>()
-                    .AddTransient<IIdGenerator, IncrementingIdGenerator>()
-                    .AddTransient<ICodeParser, CodeParser>()
-                    .AddTransient<IInterpreter, Interpreter>()
-                    .BuildServiceProvider();
-
-                var logger = services.GetRequiredService<ILogger>();
-                var codeParser = services.GetRequiredService<ICodeParser>();
-                var interpreter = services.GetRequiredService<IInterpreter>();
-
-                try
-                {
-                    using var sr = path.OpenText();
-                    using var input = inputPath?.OpenText();
-                    var code = sr.ReadToEnd();
-                    var parsedCode = codeParser.Parse(code);
-                    interpreter.Interpret(parsedCode, new InterpreterConfig
-                    {
-                        PrintOperations = printOperations,
-                        TypeSafety = typeSafety,
-                    }, input);
-                }
-                catch (InterpreterException exception)
-                {
-                    logger.WriteLine(exception.Message.Pastel(Color.IndianRed));
-                }
-                catch (IOException e)
-                {
-                    logger.WriteLine($"Exception while reading [{path}]:".Pastel(Color.IndianRed));
-                    logger.WriteLine(e.Message.Pastel(Color.IndianRed));
-                    return Task.FromResult(1);
-                }
-
-                return Task.FromResult(0);
-            },
-            inputPathOption,
-            typeSafetyOption,
-            printOperationsOption,
-            pathOption
+        runCommand.Handler = new RunCommandHandler(
+            inputPathOption, typeSafetyOption, printOperationsOption, pathArgument
         );
 
-        var rootCommand = new RootCommand("FalseDotNet CLI") { runCommand };
+        var outputPathOption = new Option<FileInfo?>(
+            aliases: ["--output", "-o"],
+            description: "File path to write assembly to. Defaults to '<input>.asm'.",
+            parseArgument: ParseFileInfo
+        );
+
+        var optimizationLevelOption = new Option<OptimizerConfig.EOptimizationLevel>(
+            aliases: ["--optimization", "-O"],
+            description: "Level of optimization: O0, O1, O2.",
+            parseArgument: result =>
+            {
+                var level = result.Tokens.FirstOrDefault();
+                if (level is null)
+                    return OptimizerConfig.EOptimizationLevel.O0;
+                switch (level.Value.ToLower())
+                {
+                    case "o0" or "0":
+                        return OptimizerConfig.EOptimizationLevel.O0;
+                    case "o1" or "1":
+                        return OptimizerConfig.EOptimizationLevel.O1;
+                    case "o2" or "2":
+                        return OptimizerConfig.EOptimizationLevel.O2;
+                    default:
+                        result.ErrorMessage = "Invalid optimization level.";
+                        return default;
+                }
+            }
+        );
+
+        var assembleOption = new Option<bool>(
+            aliases: ["--assemble", "-a"],
+            description: "Assemble using nasm."
+        );
+
+        var linkOption = new Option<bool>(
+            aliases: ["--link", "-l"],
+            description: "Link using ld."
+        );
+
+        var runOption = new Option<bool>(
+            aliases: ["--run", "-r"],
+            description: "Run after compilation."
+        );
+
+        var compileCommand = new Command("compile", "Compile a False program")
+        {
+            inputPathOption,
+            outputPathOption,
+            typeSafetyOption,
+            optimizationLevelOption,
+            assembleOption,
+            linkOption,
+            runOption,
+            pathArgument
+        };
+        compileCommand.Handler = new CompileCommandHandler(
+            inputPathOption: inputPathOption,
+            outputPathOption: outputPathOption,
+            typeSafetyOption: typeSafetyOption,
+            optimizationLevelOption: optimizationLevelOption,
+            assembleOption: assembleOption,
+            linkOption: linkOption,
+            runOption: runOption,
+            pathArgument: pathArgument
+        );
+
+        var rootCommand = new RootCommand("FalseDotNet CLI") { runCommand, compileCommand };
 
         return await rootCommand.InvokeAsync(args);
     }
