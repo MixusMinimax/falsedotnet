@@ -1,4 +1,5 @@
 ﻿using System.CommandLine;
+using System.CommandLine.Builder;
 using System.CommandLine.Parsing;
 using FalseDotNet.Cli.SubCommands;
 using FalseDotNet.Compile.Optimization;
@@ -115,6 +116,7 @@ public static class Program
         );
 
         var rootCommand = new RootCommand("FalseDotNet CLI") { runCommand, compileCommand };
+        rootCommand.Name = "falsedotnet";
 
         return await rootCommand.InvokeAsync(args);
     }
