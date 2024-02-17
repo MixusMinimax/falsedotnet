@@ -1,3 +1,7 @@
 ﻿[*]
 insert_final_newline = true
 indent_style = space
+
+[*.{cs,vb}]
+# noinspection EditorConfigKeyCorrectness
+dotnet_diagnostic.CA1826.severity = none
