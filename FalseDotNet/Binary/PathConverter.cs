@@ -11,12 +11,12 @@ public partial class PathConverter : IPathConverter
 {
     public FileInfo ConvertToWsl(FileInfo path)
     {
-        var stringPath = path.FullName;
+        var stringPath = path.ToString();
         stringPath = stringPath.Replace('\\', '/');
         stringPath = PathRegex().Replace(stringPath, m => "/mnt/" + m.ToString()[..1].ToLower());
         return new FileInfo(stringPath);
     }
 
-    [GeneratedRegex(@"^[A-Z]:")]
+    [GeneratedRegex(@"^[A-Z]:(?=[/\\])")]
     private static partial Regex PathRegex();
 }

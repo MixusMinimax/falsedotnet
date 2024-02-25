@@ -1,0 +1,14 @@
+Source: falsedotnet
+Section: cli
+Priority: optional
+Maintainer: Maxi Barmetler <maxi.barmetler@gmail.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.0
+Homepage: barmetler.com
+Rules-Requires-Root: no
+
+Package: falsedotnet
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, dotnet-runtime-8.0
+Description: FALSE compiler and interpreter written in C#
+ This package provides a compiler and interpreter for the FALSE programming language written in C#.
