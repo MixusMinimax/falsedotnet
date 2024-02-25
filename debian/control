@@ -1,5 +1,5 @@
 Source: falsedotnet
-Section: cli
+Section: devel
 Priority: optional
 Maintainer: Maxi Barmetler <maxi.barmetler@gmail.com>
 Build-Depends: debhelper-compat (= 13)
