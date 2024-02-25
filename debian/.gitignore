@@ -1,0 +1,4 @@
+﻿/.debhelper
+/falsedotnet
+/debhelper*
+/*.substvars
